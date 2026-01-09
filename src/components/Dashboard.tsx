@@ -23,7 +23,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentView }) => {
         removeAsset,
         refreshPortfolio,
         reorderAssets,
-        loadPortfolio,
         loading,
         isAdding,
         isRefreshing,
@@ -190,4 +189,4 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentView }) => {
         </div>
     );
 };
-```
+

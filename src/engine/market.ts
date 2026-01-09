@@ -236,7 +236,7 @@ function calculateRiskMetrics(values: number[], marketHistory?: number[]): RiskS
 // Robust Fetch with Guaranteed Fallback
 async function fetchAssetStats(symbol: string): Promise<AssetStats> {
     const cleanSymbol = symbol.toUpperCase().trim();
-    const cacheKey = `av_stats_${cleanSymbol}`;
+    const cacheKey = `av_stats_v2_${cleanSymbol}`;
 
     // Check Cache
     const cached = localStorage.getItem(cacheKey);
@@ -283,11 +283,21 @@ async function fetchAssetStats(symbol: string): Promise<AssetStats> {
             // 3. Calc Stats
             const stats = calculateStatsFromReturns(lReturns);
 
+            // 4. Construct Synthetic Price History
+            // We must return a price series that Reflects the leverage so that
+            // calculatePortfolioStats (which re-derives stats from history) sees the correct volatility/return.
+            const syntheticHistory: number[] = [uPrices[0]];
+            for (let i = 0; i < lReturns.length; i++) {
+                const prev = syntheticHistory[i];
+                const next = prev * Math.exp(lReturns[i]);
+                syntheticHistory.push(next);
+            }
+
             const result = {
                 symbol: cleanSymbol,
                 annualReturn: stats.annualReturn,
                 annualVolatility: stats.annualVolatility,
-                history: uPrices, // Return underlying prices for UI (or we could synthesize price history)
+                history: syntheticHistory,
                 leverage: leverage
             };
 

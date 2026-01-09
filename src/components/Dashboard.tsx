@@ -32,7 +32,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentView }) => {
     } = usePortfolio();
 
     // Simulation Hook
-    const { results, finalDistribution, stats, runSimulation, isSimulating } = useSimulation();
+    const { results, finalDistribution, stats, runSimulation, isSimulating, history, saveSimulation, deleteSimulation } = useSimulation();
 
     const handleRefresh = () => {
         refreshPortfolio(true);
@@ -176,7 +176,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentView }) => {
                         <PortfolioTable assets={assets} totalValue={totalPortfolioValue} onRemoveAsset={removeAsset} onReorder={reorderAssets} />
                     </>
                 ) : (
-                    <SimulationView results={results} distribution={finalDistribution} stats={stats} />
+                    <SimulationView
+                        results={results}
+                        distribution={finalDistribution}
+                        stats={stats}
+                        history={history}
+                        onSave={saveSimulation}
+                        onDelete={deleteSimulation}
+                    />
                 )}
             </div>
         </div>

@@ -2,10 +2,14 @@ import React from 'react';
 import { SimulationResult, SimulationStats } from '../hooks/useSimulation';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine } from 'recharts';
 
+// Update Props to include history actions
 interface SimulationViewProps {
     results: SimulationResult[];
     distribution: { range: string; count: number }[];
     stats: SimulationStats | null;
+    history?: any[]; // Avoiding circular import of SimulationRun for now, or just use any
+    onSave?: (name: string) => void;
+    onDelete?: (id: string) => void;
 }
 
 const StatCard = ({ label, value, subtext, color = 'var(--text-primary)' }: { label: string, value: string, subtext?: string, color?: string }) => (
@@ -28,13 +32,59 @@ const StatCard = ({ label, value, subtext, color = 'var(--text-primary)' }: { la
     </div>
 );
 
-export const SimulationView: React.FC<SimulationViewProps> = ({ results, distribution, stats }) => {
+const ComparisonTable = ({ history, onDelete }: { history: any[], onDelete: (id: string) => void }) => {
+    if (!history || history.length === 0) return null;
+
+    return (
+        <div style={{ marginTop: '40px', backgroundColor: 'rgba(255,255,255,0.4)', borderRadius: '12px', padding: '24px', border: '1px solid rgba(0,0,0,0.05)' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: '700', marginBottom: '16px', color: 'var(--text-primary)' }}>Comparison Matrix</h3>
+            <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                        <tr style={{ borderBottom: '1px solid var(--text-tertiary)', opacity: 0.5 }}>
+                            <th style={{ textAlign: 'left', padding: '12px', color: 'var(--text-secondary)' }}>Name</th>
+                            <th style={{ textAlign: 'right', padding: '12px', color: 'var(--text-secondary)' }}>Success Rate</th>
+                            <th style={{ textAlign: 'right', padding: '12px', color: 'var(--text-secondary)' }}>Median</th>
+                            <th style={{ textAlign: 'right', padding: '12px', color: 'var(--text-secondary)' }}>Worst Case</th>
+                            <th style={{ textAlign: 'right', padding: '12px', color: 'var(--text-secondary)' }}>Max Drawdown</th>
+                            <th style={{ textAlign: 'right', padding: '12px', color: 'var(--text-secondary)' }}>Sharpe</th>
+                            <th style={{ textAlign: 'center', padding: '12px', color: 'var(--text-secondary)' }}>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {history.map((run: any) => (
+                            <tr key={run.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                                <td style={{ padding: '12px', fontWeight: '600' }}>{run.name}</td>
+                                <td style={{ padding: '12px', textAlign: 'right', color: run.stats.successRate > 80 ? 'var(--accent-green)' : 'var(--text-primary)' }}>{run.stats.successRate.toFixed(1)}%</td>
+                                <td style={{ padding: '12px', textAlign: 'right' }}>${run.stats.median.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                                <td style={{ padding: '12px', textAlign: 'right', color: run.stats.worstCase >= run.stats.initialValue ? 'var(--accent-green)' : 'var(--accent-red)' }}>${run.stats.worstCase.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                                <td style={{ padding: '12px', textAlign: 'right', color: '#e53e3e' }}>{run.stats.riskStats?.maxDrawdown.toFixed(2)}%</td>
+                                <td style={{ padding: '12px', textAlign: 'right', color: '#2f855a' }}>{run.stats.riskStats?.sharpeRatio.toFixed(2)}</td>
+                                <td style={{ padding: '12px', textAlign: 'center' }}>
+                                    <button
+                                        onClick={() => onDelete(run.id)}
+                                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#e53e3e', opacity: 0.6 }}
+                                    >✕</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
+export const SimulationView: React.FC<SimulationViewProps> = ({ results, distribution, stats, history = [], onSave, onDelete }) => {
 
     if (!results || results.length === 0) {
         return (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', padding: '40px', color: 'var(--text-tertiary)' }}>
                 <div style={{ fontSize: '16px', fontWeight: '500' }}>No simulation data yet.</div>
                 <div style={{ fontSize: '13px', marginTop: '8px' }}>Adjust parameters in the sidebar and click "Run Simulation".</div>
+
+                {/* Show history even if empty current result, maybe? No, usually empty start. */}
+                {history.length > 0 && <ComparisonTable history={history} onDelete={onDelete!} />}
             </div>
         );
     }
@@ -44,6 +94,29 @@ export const SimulationView: React.FC<SimulationViewProps> = ({ results, distrib
 
     return (
         <div style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
+
+            {/* Header / Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+                <button
+                    onClick={() => {
+                        const name = prompt("Enter a name for this simulation run (e.g., 'Aggressive Growth')");
+                        if (name && onSave) onSave(name);
+                    }}
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: 'var(--text-primary)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    }}
+                >
+                    + Save Result to Compare
+                </button>
+            </div>
 
             {/* Stats Row */}
             {stats && (
@@ -236,6 +309,9 @@ export const SimulationView: React.FC<SimulationViewProps> = ({ results, distrib
                 </div>
 
             </div>
+
+            {/* Comparison Table */}
+            {history.length > 0 && <ComparisonTable history={history} onDelete={onDelete!} />}
         </div>
     );
 };

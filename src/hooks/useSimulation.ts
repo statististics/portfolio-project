@@ -25,11 +25,51 @@ interface SimulationParams {
     riskStats?: any;
 }
 
+export interface SimulationRun {
+    id: string;
+    name: string;
+    timestamp: number;
+    stats: SimulationStats;
+}
+
 export const useSimulation = () => {
     const [results, setResults] = useState<SimulationResult[]>([]);
     const [finalDistribution, setFinalDistribution] = useState<{ range: string; count: number }[]>([]);
     const [stats, setStats] = useState<SimulationStats | null>(null);
     const [isSimulating, setIsSimulating] = useState(false);
+
+    // History State (Persisted)
+    const [history, setHistory] = useState<SimulationRun[]>(() => {
+        try {
+            const saved = localStorage.getItem('sim_history');
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) { return []; }
+    });
+
+    // Save history to localStorage whenever it changes
+    const updateHistory = (newHistory: SimulationRun[]) => {
+        setHistory(newHistory);
+        localStorage.setItem('sim_history', JSON.stringify(newHistory));
+    };
+
+    const saveSimulation = (name: string) => {
+        if (!stats) return;
+        const newRun: SimulationRun = {
+            id: Date.now().toString(),
+            name,
+            timestamp: Date.now(),
+            stats
+        };
+        updateHistory([...history, newRun]);
+    };
+
+    const deleteSimulation = (id: string) => {
+        updateHistory(history.filter(h => h.id !== id));
+    };
+
+    const clearHistory = () => {
+        updateHistory([]);
+    };
 
     const runSimulation = useCallback((params: SimulationParams) => {
         setIsSimulating(true);
@@ -116,13 +156,17 @@ export const useSimulation = () => {
             setFinalDistribution(distribution);
             setIsSimulating(false);
         }, 100);
-    }, []);
+    }, [history]); // Add history dependency if needed, though runSimulation doesn't use it directly.
 
     return {
         results, // For Line Chart
         finalDistribution, // For Bar Chart
         stats,
         runSimulation,
-        isSimulating
+        isSimulating,
+        history,
+        saveSimulation,
+        deleteSimulation,
+        clearHistory
     };
 };

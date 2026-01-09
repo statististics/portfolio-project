@@ -28,7 +28,8 @@ export const SimulationSidebar: React.FC<SimulationSidebarProps> = ({
     const [timeHorizon, setTimeHorizon] = useState(10);
     const [numSimulations] = useState(1000); // Fixed or could be configurable
 
-    const handleRunFromModal = (data: { expectedReturn: number; volatility: number; initialValue: number }) => {
+    const handleRunFromModal = (data: { expectedReturn: number; volatility: number; initialValue: number; runStats?: any }) => {
+        console.log("DEBUG: Sidebar received runStats:", data.runStats);
         setStats({ expectedReturn: data.expectedReturn, volatility: data.volatility });
 
         // Trigger the simulation immediately
@@ -37,7 +38,8 @@ export const SimulationSidebar: React.FC<SimulationSidebarProps> = ({
             timeHorizon,
             numSimulations,
             expectedReturn: data.expectedReturn,
-            volatility: data.volatility
+            volatility: data.volatility,
+            riskStats: data.runStats
         });
     };
 

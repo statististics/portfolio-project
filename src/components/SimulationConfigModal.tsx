@@ -87,6 +87,7 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
 
             // Calculate Stats (Mean Return, Volatility, Risk)
             const stats = await calculatePortfolioStats(validItems);
+            console.log("DEBUG: ConfigModal Calculated Stats:", stats);
 
             // Run Simulation
             onRun({

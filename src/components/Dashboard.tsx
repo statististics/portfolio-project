@@ -184,13 +184,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentView }) => {
                         history={history}
                         onSave={(name) => saveSimulation(name, assets)} // Save current assets with simulation
                         onDelete={deleteSimulation}
-                        onRestore={(savedAssets) => {
-                            loadPortfolio(savedAssets);
-                            alert("Portfolio configuration loaded. Switch to Portfolio tab to view/edit.");
-                        }}
                     />
                 )}
             </div>
         </div>
     );
 };
+```

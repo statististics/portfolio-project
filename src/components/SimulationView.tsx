@@ -36,38 +36,113 @@ const ComparisonTable = ({ history, onDelete }: { history: any[], onDelete: (id:
     if (!history || history.length === 0) return null;
 
     return (
-        <div style={{ marginTop: '40px', backgroundColor: 'rgba(255,255,255,0.4)', borderRadius: '12px', padding: '24px', border: '1px solid rgba(0,0,0,0.05)' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: '700', marginBottom: '16px', color: 'var(--text-primary)' }}>Comparison Matrix</h3>
+        <div style={{
+            marginTop: '48px',
+            backgroundColor: 'rgba(255, 255, 255, 0.65)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '24px',
+            padding: '32px',
+            border: '1px solid rgba(255, 255, 255, 0.8)',
+            boxShadow: '0 20px 40px -10px rgba(0,0,0,0.05)'
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+                    Simulation History
+                </h3>
+                <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontWeight: '500' }}>
+                    {history.length} run{history.length !== 1 ? 's' : ''} stored
+                </span>
+            </div>
+
             <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 8px' }}>
                     <thead>
-                        <tr style={{ borderBottom: '1px solid var(--text-tertiary)', opacity: 0.5 }}>
-                            <th style={{ textAlign: 'left', padding: '12px', color: 'var(--text-secondary)' }}>Name</th>
-                            <th style={{ textAlign: 'right', padding: '12px', color: 'var(--text-secondary)' }}>Success Rate</th>
-                            <th style={{ textAlign: 'right', padding: '12px', color: 'var(--text-secondary)' }}>Median</th>
-                            <th style={{ textAlign: 'right', padding: '12px', color: 'var(--text-secondary)' }}>Worst Case</th>
-                            <th style={{ textAlign: 'right', padding: '12px', color: 'var(--text-secondary)' }}>Max Drawdown</th>
-                            <th style={{ textAlign: 'right', padding: '12px', color: 'var(--text-secondary)' }}>Sharpe</th>
-                            <th style={{ textAlign: 'center', padding: '12px', color: 'var(--text-secondary)' }}>Action</th>
+                        <tr>
+                            <th style={{ textAlign: 'left', padding: '0 16px 8px', color: 'var(--text-tertiary)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Portfolio Name</th>
+                            <th style={{ textAlign: 'center', padding: '0 16px 8px', color: 'var(--text-tertiary)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Success Rate</th>
+                            <th style={{ textAlign: 'right', padding: '0 16px 8px', color: 'var(--text-tertiary)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Median Result</th>
+                            <th style={{ textAlign: 'right', padding: '0 16px 8px', color: 'var(--text-tertiary)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Best Year</th>
+                            <th style={{ textAlign: 'right', padding: '0 16px 8px', color: 'var(--text-tertiary)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Max Drawdown</th>
+                            <th style={{ textAlign: 'right', padding: '0 16px 8px', color: 'var(--text-tertiary)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sharpe</th>
+                            <th style={{ textAlign: 'right', padding: '0 16px 8px', color: 'var(--text-tertiary)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', width: '40px' }}></th>
                         </tr>
                     </thead>
                     <tbody>
-                        {history.map((run: any) => (
-                            <tr key={run.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                                <td style={{ padding: '12px', fontWeight: '600' }}>{run.name}</td>
-                                <td style={{ padding: '12px', textAlign: 'right', color: run.stats.successRate > 80 ? 'var(--accent-green)' : 'var(--text-primary)' }}>{run.stats.successRate.toFixed(1)}%</td>
-                                <td style={{ padding: '12px', textAlign: 'right' }}>${run.stats.median.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
-                                <td style={{ padding: '12px', textAlign: 'right', color: run.stats.worstCase >= run.stats.initialValue ? 'var(--accent-green)' : 'var(--accent-red)' }}>${run.stats.worstCase.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
-                                <td style={{ padding: '12px', textAlign: 'right', color: '#e53e3e' }}>{run.stats.riskStats?.maxDrawdown.toFixed(2)}%</td>
-                                <td style={{ padding: '12px', textAlign: 'right', color: '#2f855a' }}>{run.stats.riskStats?.sharpeRatio.toFixed(2)}</td>
-                                <td style={{ padding: '12px', textAlign: 'center' }}>
-                                    <button
-                                        onClick={() => onDelete(run.id)}
-                                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#e53e3e', opacity: 0.6 }}
-                                    >✕</button>
-                                </td>
-                            </tr>
-                        ))}
+                        {history.map((run: any) => {
+                            const isHighSuccess = run.stats.successRate >= 80;
+                            const isMedSuccess = run.stats.successRate >= 50 && run.stats.successRate < 80;
+
+                            return (
+                                <tr key={run.id} style={{
+                                    backgroundColor: 'rgba(255,255,255,0.5)',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                                    cursor: 'default'
+                                }}>
+                                    <td style={{ padding: '16px', borderRadius: '12px 0 0 12px', fontWeight: '600', color: 'var(--text-primary)', fontSize: '14px' }}>
+                                        {run.name}
+                                    </td>
+                                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                                        <span style={{
+                                            padding: '6px 12px',
+                                            borderRadius: '20px',
+                                            fontSize: '12px',
+                                            fontWeight: '700',
+                                            backgroundColor: isHighSuccess ? 'rgba(52, 211, 153, 0.15)' : isMedSuccess ? 'rgba(251, 191, 36, 0.15)' : 'rgba(248, 113, 113, 0.15)',
+                                            color: isHighSuccess ? '#059669' : isMedSuccess ? '#d97706' : '#dc2626'
+                                        }}>
+                                            {run.stats.successRate.toFixed(1)}%
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>
+                                        ${run.stats.median.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                    </td>
+                                    <td style={{ padding: '16px', textAlign: 'right', color: 'var(--accent-green)', fontWeight: '600' }}>
+                                        +{run.stats.riskStats?.bestYear?.toFixed(1) ?? 0}%
+                                    </td>
+                                    <td style={{ padding: '16px', textAlign: 'right', color: '#e53e3e', fontWeight: '500' }}>
+                                        {run.stats.riskStats?.maxDrawdown.toFixed(2)}%
+                                    </td>
+                                    <td style={{ padding: '16px', textAlign: 'right', color: '#059669', fontWeight: '600' }}>
+                                        {run.stats.riskStats?.sharpeRatio.toFixed(2)}
+                                    </td>
+                                    <td style={{ padding: '16px', textAlign: 'right', borderRadius: '0 12px 12px 0' }}>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onDelete(run.id);
+                                            }}
+                                            title="Delete Result"
+                                            style={{
+                                                border: 'none',
+                                                background: 'rgba(255,0,0,0.05)',
+                                                width: '28px',
+                                                height: '28px',
+                                                borderRadius: '50%',
+                                                cursor: 'pointer',
+                                                color: '#ef4444',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '14px',
+                                                transition: 'all 0.2s',
+                                                opacity: 0.7
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.backgroundColor = '#fee2e2';
+                                                e.currentTarget.style.opacity = '1';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'rgba(255,0,0,0.05)';
+                                                e.currentTarget.style.opacity = '0.7';
+                                            }}
+                                        >
+                                            ✕
+                                        </button>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>

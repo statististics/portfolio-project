@@ -30,6 +30,7 @@ export interface SimulationRun {
     name: string;
     timestamp: number;
     stats: SimulationStats;
+    assets?: any[]; // Snapshot of portfolio assets
 }
 
 export const useSimulation = () => {
@@ -52,13 +53,14 @@ export const useSimulation = () => {
         localStorage.setItem('sim_history', JSON.stringify(newHistory));
     };
 
-    const saveSimulation = (name: string) => {
+    const saveSimulation = (name: string, currentAssets?: any[]) => {
         if (!stats) return;
         const newRun: SimulationRun = {
             id: Date.now().toString(),
             name,
             timestamp: Date.now(),
-            stats
+            stats,
+            assets: currentAssets
         };
         updateHistory([...history, newRun]);
     };

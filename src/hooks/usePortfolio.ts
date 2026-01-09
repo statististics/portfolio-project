@@ -197,6 +197,10 @@ export const usePortfolio = () => {
         setPortfolio(recalculateWeights(newPortfolio));
     };
 
+    const loadPortfolio = (savedAssets: Asset[]) => {
+        setPortfolio(recalculateWeights(savedAssets));
+    };
+
     return {
         portfolio,
         totalValue,
@@ -218,7 +222,8 @@ export const usePortfolio = () => {
         addAsset,
         removeAsset,
         reorderAssets,
-        refreshPortfolio
+        refreshPortfolio,
+        loadPortfolio
     };
 };
 // Export alias expected by Table

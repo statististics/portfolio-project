@@ -23,6 +23,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentView }) => {
         removeAsset,
         refreshPortfolio,
         reorderAssets,
+        loadPortfolio,
         loading,
         isAdding,
         isRefreshing,
@@ -181,8 +182,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentView }) => {
                         distribution={finalDistribution}
                         stats={stats}
                         history={history}
-                        onSave={saveSimulation}
+                        onSave={(name) => saveSimulation(name, assets)} // Save current assets with simulation
                         onDelete={deleteSimulation}
+                        onRestore={(savedAssets) => {
+                            loadPortfolio(savedAssets);
+                            alert("Portfolio configuration loaded. Switch to Portfolio tab to view/edit.");
+                        }}
                     />
                 )}
             </div>

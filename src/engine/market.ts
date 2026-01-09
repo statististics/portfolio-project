@@ -236,7 +236,7 @@ function calculateRiskMetrics(values: number[], marketHistory?: number[]): RiskS
 // Robust Fetch with Guaranteed Fallback
 async function fetchAssetStats(symbol: string): Promise<AssetStats> {
     const cleanSymbol = symbol.toUpperCase().trim();
-    const cacheKey = `av_stats_v2_${cleanSymbol}`;
+    const cacheKey = `av_stats_v3_${cleanSymbol}`;
 
     // Check Cache
     const cached = localStorage.getItem(cacheKey);

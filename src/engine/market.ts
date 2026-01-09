@@ -338,18 +338,25 @@ async function fetchAssetStats(symbol: string): Promise<AssetStats> {
         console.warn(`Fallback for ${cleanSymbol} due to:`, e);
 
         // --- ROBUST FALLBACK GENERATOR ---
-        let mu = 0.10; let sigma = 0.15; // Defaults
-        if (['SPY', 'QQQ', 'IVV', 'VOO'].includes(cleanSymbol)) { mu = 0.12; sigma = 0.18; }
-        else if (['NVDA', 'TSLA', 'AMD', 'COIN'].includes(cleanSymbol)) { mu = 0.45; sigma = 0.55; }
-        else if (['AAPL', 'MSFT', 'GOOG', 'META', 'AMZN'].includes(cleanSymbol)) { mu = 0.25; sigma = 0.30; }
-        else if (['BTC', 'ETH'].includes(cleanSymbol)) { mu = 0.70; sigma = 0.80; }
+        // --- ROBUST FALLBACK GENERATOR ---
+        // Enhanced to support Leveraged ETFs even in fallback mode (e.g. QLD hits rate limit)
+        const leverage = detectLeverage(cleanSymbol);
+        const underlying = UNDERLYING_MAP[cleanSymbol] || cleanSymbol; // QLD -> QQQ, or just AAPL -> AAPL
+
+        let mu = 0.10; let sigma = 0.15; // Defaults for unknown
+        if (['SPY', 'QQQ', 'IVV', 'VOO', 'DIA'].includes(underlying)) { mu = 0.12; sigma = 0.18; }
+        else if (['NVDA', 'TSLA', 'AMD', 'COIN'].includes(underlying)) { mu = 0.45; sigma = 0.55; }
+        else if (['AAPL', 'MSFT', 'GOOG', 'META', 'AMZN'].includes(underlying)) { mu = 0.25; sigma = 0.30; }
+        else if (['BTC', 'ETH'].includes(underlying)) { mu = 0.70; sigma = 0.80; }
+        else if (['SOXX', 'SMH'].includes(underlying)) { mu = 0.20; sigma = 0.35; }
 
         const startPrice = 100;
-        const fakeHistory = [startPrice];
+        const fakeUnderlyingHistory = [startPrice];
         const dt = 1 / 12;
 
+        // Generate Underlying Path
         for (let i = 0; i < 120; i++) {
-            const prev = fakeHistory[fakeHistory.length - 1];
+            const prev = fakeUnderlyingHistory[fakeUnderlyingHistory.length - 1];
             // Random Normal
             const u1 = Math.random();
             const u2 = Math.random();
@@ -359,16 +366,42 @@ async function fetchAssetStats(symbol: string): Promise<AssetStats> {
             const diffusion = sigma * Math.sqrt(dt) * z;
             const change = Math.exp(drift + diffusion);
 
-            fakeHistory.push(prev * change);
+            fakeUnderlyingHistory.push(prev * change);
         }
 
-        const stats = calculateStatsFromHistory(fakeHistory);
+        // Use Underlying or Synthesize Leveraged
+        let finalHistory = fakeUnderlyingHistory;
+
+        if (Math.abs(leverage) > 1) {
+            // Apply Model 2.0 Logic to the Fake History
+            const uReturns: number[] = [];
+            for (let i = 1; i < fakeUnderlyingHistory.length; i++) {
+                uReturns.push(Math.log(fakeUnderlyingHistory[i] / (fakeUnderlyingHistory[i - 1] || 1)));
+            }
+
+            const lReturns = uReturns.map(r_u => {
+                const R_u = Math.exp(r_u) - 1;
+                const R_L = leverage * R_u;
+                if (R_L <= -0.99) return -4.6;
+                return Math.log(1 + R_L);
+            });
+
+            const syntheticHistory: number[] = [fakeUnderlyingHistory[0]];
+            for (let i = 0; i < lReturns.length; i++) {
+                const prev = syntheticHistory[i];
+                const next = prev * Math.exp(lReturns[i]);
+                syntheticHistory.push(next);
+            }
+            finalHistory = syntheticHistory;
+        }
+
+        const stats = calculateStatsFromHistory(finalHistory);
         return {
             symbol: cleanSymbol,
             annualReturn: stats.annualReturn,
             annualVolatility: stats.annualVolatility,
-            history: fakeHistory,
-            leverage: detectLeverage(cleanSymbol)
+            history: finalHistory,
+            leverage: leverage
         };
     }
 }

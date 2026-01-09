@@ -12,6 +12,7 @@ export interface SimulationStats {
     successRate: number; // % of sims ending > target or initial if target not set
     targetGoal?: number;
     riskStats?: RiskStats;
+    initialValue: number;
 }
 
 interface SimulationParams {
@@ -111,7 +112,7 @@ export const useSimulation = () => {
             });
 
             setResults(chartData);
-            setStats({ median, worstCase, successRate, targetGoal, riskStats });
+            setStats({ median, worstCase, successRate, targetGoal, riskStats, initialValue });
             setFinalDistribution(distribution);
             setIsSimulating(false);
         }, 100);

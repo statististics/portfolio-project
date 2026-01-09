@@ -63,7 +63,7 @@ export const SimulationView: React.FC<SimulationViewProps> = ({ results, distrib
                         label="Worst Case (5%)"
                         value={`$${stats.worstCase.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
                         subtext="95% confident it handles better"
-                        color="var(--accent-red)"
+                        color={stats.worstCase >= stats.initialValue ? 'var(--accent-green)' : 'var(--accent-red)'}
                     />
                 </div>
             )}

@@ -1,7 +1,7 @@
 // --- Real Historical Data Engine (Alpha Vantage) ---
 
 // Placeholder key; replace with real one for prod.
-const AV_API_KEY = 'DEMO';
+const AV_API_KEY = import.meta.env.VITE_AV_API_KEY || 'DEMO';
 
 interface AVMonthlyResponse {
     "Meta Data": any;
@@ -21,7 +21,40 @@ export interface QuoteData {
     change: number;
     changePercent: number;
     source: 'LIVE' | 'CACHE' | 'ERROR';
+    leverage: number; // 1 = 1x (normal), 2 = 2x, 3 = 3x, etc.
 }
+
+// --- Leverage Configuration ---
+export const LEVERAGE_MAP: { [symbol: string]: number } = {
+    // 2x Bull
+    'QLD': 2, 'SSO': 2, 'UWM': 2, 'MVV': 2, 'USD': 2,
+    // 3x Bull
+    'TQQQ': 3, 'UPRO': 3, 'UDOW': 3, 'TNA': 3, 'MIDU': 3,
+    'FNGU': 3, 'SOXL': 3, 'TECL': 3,
+    // 2x Bear (Short) - optional, treated as negative leverage or just ignored for now?
+    // Let's assume user wants simple leverage ratio for volatility scaling for now.
+    // 1x Inverse
+    'PSQ': -1, 'SH': -1, 'DOG': -1,
+    // 2x Bear
+    'QID': -2, 'SDS': -2,
+    // 3x Bear
+    'SQQQ': -3, 'SPXU': -3,
+};
+
+export function detectLeverage(symbol: string): number {
+    const clean = symbol.toUpperCase().trim();
+    return LEVERAGE_MAP[clean] || 1;
+}
+
+export const UNDERLYING_MAP: { [symbol: string]: string } = {
+    'QLD': 'QQQ', 'TQQQ': 'QQQ',
+    'SSO': 'SPY', 'UPRO': 'SPY',
+    'SOXL': 'SOXX', 'TECL': 'XLK',
+    'FNGU': 'QQQ', // Approximation for FANG+
+    // Bears
+    'SQQQ': 'QQQ', 'PSQ': 'QQQ',
+    'SPXU': 'SPY', 'SH': 'SPY', 'SDS': 'SPY'
+};
 
 const FINNHUB_API_KEY = 'd5fo8gpr01qnjhodihkgd5fo8gpr01qnjhodihl0';
 
@@ -54,7 +87,8 @@ export async function fetchQuote(symbol: string): Promise<QuoteData | null> {
             price: data.c,
             change: data.d,
             changePercent: data.dp,
-            source: 'LIVE'
+            source: 'LIVE',
+            leverage: detectLeverage(cleanSymbol)
         };
     } catch (e) {
         console.warn("Quote fetch failed", e);
@@ -64,7 +98,8 @@ export async function fetchQuote(symbol: string): Promise<QuoteData | null> {
             price: 150.00,
             change: 1.5,
             changePercent: 1.0,
-            source: 'ERROR'
+            source: 'ERROR',
+            leverage: detectLeverage(cleanSymbol)
         };
     }
 }
@@ -76,6 +111,7 @@ export interface AssetStats {
     annualReturn: number;
     annualVolatility: number;
     history: number[]; // Critical: Full price history
+    leverage: number;
 }
 
 export interface RiskStats {
@@ -84,6 +120,23 @@ export interface RiskStats {
     bestYear: number; // %
     worstYear: number; // %
     beta: number;
+}
+
+// Calculate Annualized Return and Volatility from Price History
+// Calculate Annualized Return and Volatility from Log Returns
+function calculateStatsFromReturns(returns: number[]): { annualReturn: number; annualVolatility: number } {
+    const n = returns.length;
+    if (n === 0) return { annualReturn: 0, annualVolatility: 0 };
+
+    const mean = returns.reduce((a, b) => a + b, 0) / n;
+    const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n - 1);
+    const stdDev = Math.sqrt(Math.max(0, variance));
+
+    // Annualize
+    const annualizedReturn = (mean * 12) * 100;
+    const annualizedVol = (stdDev * Math.sqrt(12)) * 100;
+
+    return { annualReturn: annualizedReturn, annualVolatility: annualizedVol };
 }
 
 // Calculate Annualized Return and Volatility from Price History
@@ -99,19 +152,8 @@ function calculateStatsFromHistory(prices: number[]): { annualReturn: number; an
         returns.push(r);
     }
 
-    // 2. Mean & StdDev
-    const n = returns.length;
-    if (n === 0) return { annualReturn: 0, annualVolatility: 0, returns: [] };
-
-    const mean = returns.reduce((a, b) => a + b, 0) / n;
-    const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n - 1);
-    const stdDev = Math.sqrt(Math.max(0, variance));
-
-    // 3. Annualize
-    const annualizedReturn = (mean * 12) * 100;
-    const annualizedVol = (stdDev * Math.sqrt(12)) * 100;
-
-    return { annualReturn: annualizedReturn, annualVolatility: annualizedVol, returns };
+    const stats = calculateStatsFromReturns(returns);
+    return { ...stats, returns };
 }
 
 function calculateBeta(portReturns: number[], marketReturns: number[]): number {
@@ -208,6 +250,51 @@ async function fetchAssetStats(symbol: string): Promise<AssetStats> {
     }
 
     try {
+        const leverage = detectLeverage(cleanSymbol);
+        const underlyingSymbol = UNDERLYING_MAP[cleanSymbol];
+
+        // --- MODEL 2.0: Synthetic Leveraged Returns ---
+        if (Math.abs(leverage) > 1 && underlyingSymbol) {
+            console.log(`[Model 2.0] Fetching underlying ${underlyingSymbol} for ${cleanSymbol} (L=${leverage})`);
+            const underlyingStats = await fetchAssetStats(underlyingSymbol);
+            const uPrices = underlyingStats.history;
+
+            if (!uPrices || uPrices.length < 12) throw new Error("Underlying data insufficient");
+
+            // 1. Calculate Underlying Log Returns
+            const uReturns: number[] = [];
+            for (let i = 1; i < uPrices.length; i++) {
+                uReturns.push(Math.log(uPrices[i] / (uPrices[i - 1] || 1)));
+            }
+
+            // 2. Transform to Leveraged Log Returns
+            // Formula: r_L = ln(1 + L * (exp(r_u) - 1))
+            const lReturns = uReturns.map(r_u => {
+                const R_u = Math.exp(r_u) - 1;       // Simple Return
+                const R_L = leverage * R_u;          // Leveraged Simple Return
+
+                // Safety: Limit extreme losses to -99% (log(0.01) approx -4.6)
+                // In simulation, bankruptcy is possible, but for stats calculation we clip to avoid NaN
+                if (R_L <= -0.99) return -4.6;
+
+                return Math.log(1 + R_L);            // New Log Return
+            });
+
+            // 3. Calc Stats
+            const stats = calculateStatsFromReturns(lReturns);
+
+            const result = {
+                symbol: cleanSymbol,
+                annualReturn: stats.annualReturn,
+                annualVolatility: stats.annualVolatility,
+                history: uPrices, // Return underlying prices for UI (or we could synthesize price history)
+                leverage: leverage
+            };
+
+            localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), data: result }));
+            return result;
+        }
+
         console.log(`Fetching history for ${cleanSymbol}...`);
         const url = `https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY_ADJUSTED&symbol=${cleanSymbol}&apikey=${AV_API_KEY}`;
         const res = await fetchWithTimeout(url, 6000); // 6s timeout for history
@@ -230,7 +317,8 @@ async function fetchAssetStats(symbol: string): Promise<AssetStats> {
             symbol: cleanSymbol,
             annualReturn: stats.annualReturn,
             annualVolatility: stats.annualVolatility,
-            history: recentPrices
+            history: recentPrices,
+            leverage: detectLeverage(cleanSymbol)
         };
 
         localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), data: result }));
@@ -269,7 +357,8 @@ async function fetchAssetStats(symbol: string): Promise<AssetStats> {
             symbol: cleanSymbol,
             annualReturn: stats.annualReturn,
             annualVolatility: stats.annualVolatility,
-            history: fakeHistory
+            history: fakeHistory,
+            leverage: detectLeverage(cleanSymbol)
         };
     }
 }

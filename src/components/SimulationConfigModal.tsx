@@ -186,7 +186,22 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
                                     borderRadius: '12px',
                                     border: '1px solid #e2e8f0'
                                 }}>
-                                    <div style={{ fontWeight: '700' }}>{item.symbol}</div>
+                                    <div style={{ fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        {item.symbol}
+                                        {/* @ts-ignore - item might have leverage if extended or we can look it up live */}
+                                        {((item as any).leverage && Math.abs((item as any).leverage) > 1) && (
+                                            <span style={{
+                                                fontSize: '10px',
+                                                padding: '2px 6px',
+                                                borderRadius: '4px',
+                                                backgroundColor: (item as any).leverage > 0 ? '#dbeafe' : '#fee2e2',
+                                                color: (item as any).leverage > 0 ? '#1e40af' : '#991b1b',
+                                                fontWeight: '800'
+                                            }}>
+                                                {(item as any).leverage}x
+                                            </span>
+                                        )}
+                                    </div>
                                     <div style={{ fontSize: '13px' }}>{item.shares}</div>
                                     <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>${item.price.toFixed(2)}</div>
                                     <div style={{ fontWeight: '600' }}>${item.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
@@ -214,7 +229,7 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
                             <input
                                 placeholder="e.g. NVDA"
                                 value={newSymbol}
-                                onChange={e => setNewSymbol(e.target.value)}
+                                onChange={e => setNewSymbol(e.target.value.toUpperCase())}
                                 style={{
                                     width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '14px', fontWeight: '600', boxSizing: 'border-box'
                                 }}

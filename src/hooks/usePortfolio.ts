@@ -19,6 +19,7 @@ export interface Asset {
     totalValue: number;
     weight: number;
     source?: string;
+    leverage?: number;
 }
 
 export const usePortfolio = () => {
@@ -80,7 +81,8 @@ export const usePortfolio = () => {
                     price: currentPrice,
                     change: 0,
                     changePercent: 0,
-                    source: 'ERROR'
+                    source: 'ERROR',
+                    leverage: 1
                 };
             }
 
@@ -108,7 +110,8 @@ export const usePortfolio = () => {
                 returnPercent: costBasis > 0 ? ((currentPrice - costBasis) / costBasis) * 100 : 0,
                 totalValue: val,
                 weight: 0, // Will be calculated next
-                source: quoteData.source || 'ERROR'
+                source: quoteData.source || 'ERROR',
+                leverage: quoteData.leverage || 1
             };
 
             // 4. Update state with recalculated weights
@@ -152,7 +155,8 @@ export const usePortfolio = () => {
                                     price: quote.price,
                                     value: val,
                                     gain: val - (s.avgPrice * s.shares),
-                                    gainPercent: ((quote.price - s.avgPrice) / s.avgPrice) * 100
+                                    gainPercent: ((quote.price - s.avgPrice) / s.avgPrice) * 100,
+                                    leverage: quote.leverage || 1
                                 };
                             }
                             return s;

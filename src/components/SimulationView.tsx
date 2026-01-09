@@ -1,4 +1,5 @@
 import React from 'react';
+import { Trash2 } from 'lucide-react';
 import { SimulationResult, SimulationStats } from '../hooks/useSimulation';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine } from 'recharts';
 
@@ -97,8 +98,8 @@ const ComparisonTable = ({ history, onDelete }: { history: any[], onDelete: (id:
                                     <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>
                                         ${run.stats.median.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                     </td>
-                                    <td style={{ padding: '16px', textAlign: 'right', color: 'var(--accent-green)', fontWeight: '600' }}>
-                                        +{run.stats.riskStats?.bestYear?.toFixed(1) ?? 0}%
+                                    <td style={{ padding: '16px', textAlign: 'right', color: (run.stats.riskStats?.bestYear ?? 0) >= 0 ? 'var(--accent-green)' : '#e53e3e', fontWeight: '600' }}>
+                                        {(run.stats.riskStats?.bestYear ?? 0) > 0 ? '+' : ''}{run.stats.riskStats?.bestYear?.toFixed(1) ?? 0}%
                                     </td>
                                     <td style={{ padding: '16px', textAlign: 'right', color: '#e53e3e', fontWeight: '500' }}>
                                         {run.stats.riskStats?.maxDrawdown.toFixed(2)}%
@@ -115,29 +116,30 @@ const ComparisonTable = ({ history, onDelete }: { history: any[], onDelete: (id:
                                             title="Delete Result"
                                             style={{
                                                 border: 'none',
-                                                background: 'rgba(255,0,0,0.05)',
+                                                background: 'transparent',
                                                 width: '28px',
                                                 height: '28px',
                                                 borderRadius: '50%',
                                                 cursor: 'pointer',
-                                                color: '#ef4444',
+                                                color: 'var(--text-tertiary)',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
-                                                fontSize: '14px',
                                                 transition: 'all 0.2s',
-                                                opacity: 0.7
+                                                opacity: 0.6
                                             }}
                                             onMouseEnter={(e) => {
-                                                e.currentTarget.style.backgroundColor = '#fee2e2';
+                                                e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)';
+                                                e.currentTarget.style.color = 'var(--text-secondary)';
                                                 e.currentTarget.style.opacity = '1';
                                             }}
                                             onMouseLeave={(e) => {
-                                                e.currentTarget.style.backgroundColor = 'rgba(255,0,0,0.05)';
-                                                e.currentTarget.style.opacity = '0.7';
+                                                e.currentTarget.style.backgroundColor = 'transparent';
+                                                e.currentTarget.style.color = 'var(--text-tertiary)';
+                                                e.currentTarget.style.opacity = '0.6';
                                             }}
                                         >
-                                            ✕
+                                            <Trash2 size={14} />
                                         </button>
                                     </td>
                                 </tr>
@@ -257,8 +259,8 @@ export const SimulationView: React.FC<SimulationViewProps> = ({ results, distrib
                         {/* Best Year */}
                         <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                             <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '4px' }}>Best Year</div>
-                            <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--accent-green)' }}>
-                                +{stats.riskStats.bestYear.toFixed(1)}%
+                            <div style={{ fontSize: '20px', fontWeight: '800', color: stats.riskStats.bestYear >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+                                {stats.riskStats.bestYear > 0 ? '+' : ''}{stats.riskStats.bestYear.toFixed(1)}%
                             </div>
                             <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Highest 12mo gain</div>
                         </div>
@@ -266,10 +268,14 @@ export const SimulationView: React.FC<SimulationViewProps> = ({ results, distrib
                         {/* Worst Year */}
                         <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                             <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '4px' }}>Worst Year</div>
-                            <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--accent-red)' }}>
-                                {stats.riskStats.worstYear.toFixed(1)}%
+                            <div style={{ fontSize: '20px', fontWeight: '800', color: stats.riskStats.worstYear >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+                                {stats.riskStats.worstYear > 0 ? '+' : ''}{stats.riskStats.worstYear.toFixed(1)}%
                             </div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Lowest 12mo return</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                                {Math.abs(stats.riskStats.bestYear - stats.riskStats.worstYear) < 0.001
+                                    ? <span style={{ color: 'var(--accent-orange)', fontWeight: '700' }}>⚠️ Single Year Period</span>
+                                    : "Lowest 12mo return"}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -387,6 +393,34 @@ export const SimulationView: React.FC<SimulationViewProps> = ({ results, distrib
 
             {/* Comparison Table */}
             {history.length > 0 && <ComparisonTable history={history} onDelete={onDelete!} />}
+
+            {/* Debug UI (Deep Debug Mode) */}
+            {stats?.riskStats?.runStats && (
+                <div style={{ marginTop: '32px', padding: '16px', background: '#2d3748', borderRadius: '8px', color: '#e2e8f0', fontFamily: 'monospace', fontSize: '11px' }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#63b3ed' }}>DEBUG: Data Engine Stats</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                        <div>
+                            <div>Mode: <span style={{ color: '#f6ad55' }}>{stats.riskStats.runStats.alignmentMode}</span></div>
+                            <div>Anchor: {stats.riskStats.runStats.anchor}</div>
+                        </div>
+                        <div>
+                            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Input Data Points:</div>
+                            {Array.isArray(stats.riskStats.runStats.tickers) && stats.riskStats.runStats.tickers.map((t: string, i: number) => (
+                                <div key={i}>{t}</div>
+                            ))}
+                        </div>
+                    </div>
+                    {stats.riskStats.runStats.calculated && (
+                        <div style={{ marginTop: '12px', borderTop: '1px solid #4a5568', paddingTop: '8px' }}>
+                            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Raw Engine Output:</div>
+                            <div>Return: {stats.riskStats.runStats.calculated.pReturn}</div>
+                            <div>Vol: {stats.riskStats.runStats.calculated.pVol}</div>
+                            <div>Beta: {stats.riskStats.runStats.calculated.beta}</div>
+                            <div>BestYear: {stats.riskStats.runStats.calculated.bestYear}</div>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

@@ -22,6 +22,7 @@ interface SimulationParams {
     numSimulations: number;
     expectedReturn: number; // annual %
     volatility: number; // annual %
+    dataPeriod?: string; // "1Y" | "3Y" | "5Y" | "MAX"
     riskStats?: any;
 }
 
@@ -78,8 +79,18 @@ export const useSimulation = () => {
         setTimeout(() => { // Allow UI to render loading state
             const { initialValue, targetGoal, timeHorizon, numSimulations, expectedReturn, volatility, riskStats } = params;
             const dt = 1; // Time step: 1 year
-            const mu = expectedReturn / 100;
-            const sigma = volatility / 100;
+
+            // --- SAFETY VALVE ---
+            // If expectedReturn is > 200 (200%), cap it at 20 (20%).
+            // Use 2.0 multiplier check.
+            let mu = expectedReturn / 100;
+            if (Math.abs(mu) > 2.0) {
+                console.error(`Simulation Safety Valve Triggered: mu=${mu} is too high. Capping at 0.2.`);
+                mu = 0.2;
+            }
+
+            let sigma = volatility / 100;
+            if (sigma > 5.0) sigma = 1.0; // Cap vol at 500% -> 100%
 
             const newResults: SimulationResult[] = [];
             const finalValues: number[] = [];

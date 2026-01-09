@@ -5,7 +5,7 @@ import { calculatePortfolioStats, fetchQuote } from '../engine/market';
 interface SimulationConfigModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onRun: (data: { expectedReturn: number; volatility: number; initialValue: number; runStats?: any }) => void;
+    onRun: (data: { expectedReturn: number; volatility: number; initialValue: number; runStats?: any; dataPeriod?: string }) => void;
     initialTotalValue: number;
     currentPortfolio?: { symbol: string; quantity: number }[];
 }
@@ -29,6 +29,8 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
     const [newShares, setNewShares] = useState(0);
     const [calculating, setCalculating] = useState(false);
     const [addingTicker, setAddingTicker] = useState(false);
+
+    const [dataPeriod, setDataPeriod] = useState<'1Y' | '3Y' | '5Y' | 'MAX'>('MAX');
 
     const handleAddItem = async () => {
         if (!newSymbol || newShares <= 0) return;
@@ -67,42 +69,68 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
 
     const getTotalValue = () => items.reduce((sum, i) => sum + i.value, 0);
 
-    const handleRun = async () => {
+    const runSimulation = async (shouldClose: boolean = false) => {
+        if (items.length === 0) return;
+
         setCalculating(true);
         try {
             const totalValue = getTotalValue();
-            if (totalValue === 0) {
-                alert("Portfolio value is 0. Add assets.");
-                setCalculating(false);
-                return;
-            }
 
             // Pass strict shares for accurate history reconstruction
-            // market.ts now handles { symbol, shares }
             const validItems = items.map(i => ({
                 symbol: i.symbol,
                 shares: i.shares,
-                weight: 0 // Unused by new engine but keeps TS happy if mixed
+                weight: 0
             }));
 
-            // Calculate Stats (Mean Return, Volatility, Risk)
-            const stats = await calculatePortfolioStats(validItems);
-            console.log("DEBUG: ConfigModal Calculated Stats:", stats);
+            // Calculate Stats
+            const stats = await calculatePortfolioStats(validItems, dataPeriod);
 
-            // Run Simulation
+            // Run Simulation (Update Parent)
             onRun({
                 expectedReturn: stats.expectedReturn,
                 volatility: stats.volatility,
-                runStats: stats, // Pass full risk stats
-                initialValue: totalValue
+                runStats: stats,
+                initialValue: totalValue,
+                dataPeriod: dataPeriod
             });
-            onClose();
-        } catch (e) {
-            console.error("Simulation Prep Failed", e);
-            alert("Failed to calculate simulation parameters.");
+
+            if (shouldClose) {
+                onClose();
+            }
+
+        } catch (e: any) {
+            console.warn("Calculation failed during reactive update:", e);
+            // Only alert if user explicitly clicked "Run"
+            if (shouldClose) {
+                // Show actual error for debugging
+                const msg = e instanceof Error ? e.message : String(e);
+                alert(`Analysis failed: ${msg}. Please reset.`);
+            }
         } finally {
             setCalculating(false);
         }
+    };
+
+    // Reactive Update: Recalculate whenever Period or Items change
+    React.useEffect(() => {
+        // Debounce slightly or just run? User requested "Immediately".
+        // But if items are being added, maybe wait? 
+        // We will run if items exist.
+        if (items.length > 0) {
+            runSimulation(false);
+        }
+    }, [dataPeriod, items.length]); // Use items.length to avoid deep dependency issues, though items content change should also trigger. 
+    // Actually, if we change shares, items object refs might change. 
+    // Let's use items as dependency but be careful.
+    // simpler: dependencies [dataPeriod, items] 
+
+    const handleRun = () => {
+        if (items.length === 0) {
+            alert("Portfolio value is 0. Add assets.");
+            return;
+        }
+        runSimulation(true);
     };
 
     if (!isOpen) return null;
@@ -282,6 +310,39 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
                         <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--accent-green)' }}>
                             ${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
+                    </div>
+
+                    {/* Data Period Selector */}
+                    <div style={{ marginTop: '24px' }}>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                            Historical Data Period
+                        </label>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            {['1Y', '3Y', '5Y', 'MAX'].map((p) => (
+                                <button
+                                    key={p}
+                                    onClick={() => setDataPeriod(p as any)}
+                                    style={{
+                                        flex: 1,
+                                        padding: '8px',
+                                        borderRadius: '8px',
+                                        border: '1px solid',
+                                        borderColor: dataPeriod === p ? 'var(--text-primary)' : '#e5e7eb',
+                                        backgroundColor: dataPeriod === p ? 'var(--text-primary)' : 'white',
+                                        color: dataPeriod === p ? 'white' : 'var(--text-secondary)',
+                                        fontSize: '12px',
+                                        fontWeight: '700',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    {p}
+                                </button>
+                            ))}
+                        </div>
+                        <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '6px' }}>
+                            Only data from the last {dataPeriod === 'MAX' ? '20 years' : dataPeriod} will be used to calculate Volatility and Beta.
+                        </p>
                     </div>
 
                 </div>

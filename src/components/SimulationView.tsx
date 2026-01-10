@@ -1,5 +1,6 @@
 import React from 'react';
 import { Trash2 } from 'lucide-react';
+import { SaveSimulationModal } from './SaveSimulationModal';
 import { SimulationResult, SimulationStats } from '../hooks/useSimulation';
 import { ComposedChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine, Legend } from 'recharts';
 
@@ -73,6 +74,25 @@ const ComparisonTable = ({ history, onDelete }: { history: any[], onDelete: (id:
                             const isHighSuccess = run.stats.successRate >= 80;
                             const isMedSuccess = run.stats.successRate >= 50 && run.stats.successRate < 80;
 
+                            // LOGIC FIX: Determine which metrics to show
+                            // If DCA (isDca), use Simulated Projected Metrics (decimal -> percent)
+                            // If Lump Sum (!isDca), use Historical Risk Metrics (percent -> percent)
+                            const isDca = run.stats.isDca;
+
+                            let bestYear, maxDrawdown, sharpe;
+
+                            if (isDca) {
+                                // Projected Metrics (Decimals) - Convert to %
+                                bestYear = (run.stats.portfolioBestYear ?? 0) * 100;
+                                maxDrawdown = (run.stats.portfolioMDD ?? 0) * 100;
+                                sharpe = run.stats.portfolioSharpe ?? 0;
+                            } else {
+                                // Historical Metrics (Already %)
+                                bestYear = run.stats.riskStats?.bestYear ?? 0;
+                                maxDrawdown = run.stats.riskStats?.maxDrawdown ?? 0;
+                                sharpe = run.stats.riskStats?.sharpeRatio ?? 0;
+                            }
+
                             return (
                                 <tr key={run.id} style={{
                                     backgroundColor: 'rgba(255,255,255,0.5)',
@@ -82,6 +102,7 @@ const ComparisonTable = ({ history, onDelete }: { history: any[], onDelete: (id:
                                 }}>
                                     <td style={{ padding: '16px', borderRadius: '12px 0 0 12px', fontWeight: '600', color: 'var(--text-primary)', fontSize: '14px' }}>
                                         {run.name}
+                                        {isDca && <span style={{ fontSize: '10px', marginLeft: '6px', color: 'var(--text-tertiary)', fontWeight: '400' }}>(DCA)</span>}
                                     </td>
                                     <td style={{ padding: '16px', textAlign: 'center' }}>
                                         <span style={{
@@ -98,15 +119,16 @@ const ComparisonTable = ({ history, onDelete }: { history: any[], onDelete: (id:
                                     <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>
                                         ${run.stats.median.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                     </td>
-                                    <td style={{ padding: '16px', textAlign: 'right', color: (run.stats.riskStats?.bestYear ?? 0) >= 0 ? 'var(--accent-green)' : '#e53e3e', fontWeight: '600' }}>
-                                        {(run.stats.riskStats?.bestYear ?? 0) > 0 ? '+' : ''}{run.stats.riskStats?.bestYear?.toFixed(1) ?? 0}%
+                                    <td style={{ padding: '16px', textAlign: 'right', color: bestYear >= 0 ? 'var(--accent-green)' : '#e53e3e', fontWeight: '600' }}>
+                                        {bestYear > 0 ? '+' : ''}{bestYear.toFixed(1)}%
                                     </td>
                                     <td style={{ padding: '16px', textAlign: 'right', color: '#e53e3e', fontWeight: '500' }}>
-                                        {run.stats.riskStats?.maxDrawdown.toFixed(2)}%
+                                        {maxDrawdown.toFixed(2)}%
                                     </td>
                                     <td style={{ padding: '16px', textAlign: 'right', color: '#059669', fontWeight: '600' }}>
-                                        {run.stats.riskStats?.sharpeRatio.toFixed(2)}
+                                        {sharpe.toFixed(2)}
                                     </td>
+
                                     <td style={{ padding: '16px', textAlign: 'right', borderRadius: '0 12px 12px 0' }}>
                                         <button
                                             onClick={(e) => {
@@ -212,16 +234,16 @@ export const SimulationView: React.FC<SimulationViewProps> = ({ results, distrib
     // Get keys for line chart (sim0, sim1...)
     const keys = Object.keys(results[0]).filter(k => k.startsWith('sim'));
 
+    // Modal State
+    const [isSaveModalOpen, setIsSaveModalOpen] = React.useState(false);
+
     return (
         <div style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
 
             {/* Header / Actions */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
                 <button
-                    onClick={() => {
-                        const name = prompt("Enter a name for this simulation run (e.g., 'Aggressive Growth')");
-                        if (name && onSave) onSave(name);
-                    }}
+                    onClick={() => setIsSaveModalOpen(true)}
                     style={{
                         padding: '8px 16px',
                         backgroundColor: 'var(--text-primary)',
@@ -576,6 +598,13 @@ export const SimulationView: React.FC<SimulationViewProps> = ({ results, distrib
             {/* Comparison Table */}
             {history.length > 0 && <ComparisonTable history={history} onDelete={onDelete!} />}
 
+            <SaveSimulationModal
+                isOpen={isSaveModalOpen}
+                onClose={() => setIsSaveModalOpen(false)}
+                onSave={(name) => {
+                    if (onSave) onSave(name);
+                }}
+            />
         </div>
     );
 };

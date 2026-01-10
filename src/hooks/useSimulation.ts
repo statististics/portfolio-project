@@ -72,15 +72,28 @@ export const useSimulation = () => {
     };
 
     const saveSimulation = (name: string, currentAssets?: any[]) => {
-        if (!stats) return;
-        const newRun: SimulationRun = {
-            id: Date.now().toString(),
-            name,
-            timestamp: Date.now(),
-            stats,
-            assets: currentAssets
-        };
-        updateHistory([...history, newRun]);
+        console.log("Attempting to save simulation:", name);
+        if (!stats) {
+            console.error("Save failed: No stats available");
+            return;
+        }
+
+        try {
+            const newRun: SimulationRun = {
+                id: Date.now().toString(),
+                name,
+                timestamp: Date.now(),
+                stats,
+                assets: currentAssets
+            };
+            const newHistory = [...history, newRun];
+            setHistory(newHistory);
+            localStorage.setItem('sim_history', JSON.stringify(newHistory));
+            console.log("Simulation saved successfully:", newRun.id);
+        } catch (e) {
+            console.error("Failed to save simulation:", e);
+            alert("Failed to save simulation. Your browser storage might be full.");
+        }
     };
 
     const deleteSimulation = (id: string) => {

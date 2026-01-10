@@ -5,7 +5,7 @@ import { calculatePortfolioStats, fetchQuote } from '../engine/market';
 interface SimulationConfigModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onRun: (data: { expectedReturn: number; volatility: number; initialValue: number; runStats?: any; dataPeriod?: string }) => void;
+    onRun: (data: { expectedReturn: number; volatility: number; initialValue: number; runStats?: any; dataPeriod?: string, benchmark?: { expectedReturn: number, volatility: number } }) => void;
     initialTotalValue: number;
     currentPortfolio?: { symbol: string; quantity: number }[];
 }
@@ -92,7 +92,11 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
                 volatility: stats.volatility,
                 runStats: stats,
                 initialValue: totalValue,
-                dataPeriod: dataPeriod
+                dataPeriod: dataPeriod,
+                benchmark: (stats.benchmarkReturn && stats.benchmarkVolatility) ? {
+                    expectedReturn: stats.benchmarkReturn,
+                    volatility: stats.benchmarkVolatility
+                } : undefined
             });
 
             if (shouldClose) {

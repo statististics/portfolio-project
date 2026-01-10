@@ -12,6 +12,7 @@ interface SimulationSidebarProps {
         volatility: number;
         riskStats?: any;
         dataPeriod?: string;
+        benchmark?: { expectedReturn: number, volatility: number };
     }) => void;
     isSimulating: boolean;
 }
@@ -29,7 +30,7 @@ export const SimulationSidebar: React.FC<SimulationSidebarProps> = ({
     const [timeHorizon, setTimeHorizon] = useState(10);
     const [numSimulations] = useState(1000); // Fixed or could be configurable
 
-    const handleRunFromModal = (data: { expectedReturn: number; volatility: number; initialValue: number; runStats?: any; dataPeriod?: string }) => {
+    const handleRunFromModal = (data: { expectedReturn: number; volatility: number; initialValue: number; runStats?: any; dataPeriod?: string, benchmark?: { expectedReturn: number, volatility: number } }) => {
         console.log("DEBUG: Sidebar received runStats:", data.runStats);
         setStats({
             expectedReturn: data.expectedReturn,
@@ -46,7 +47,8 @@ export const SimulationSidebar: React.FC<SimulationSidebarProps> = ({
             expectedReturn: data.expectedReturn,
             volatility: data.volatility,
             riskStats: data.runStats,
-            dataPeriod: data.dataPeriod
+            dataPeriod: data.dataPeriod,
+            benchmark: data.benchmark
         });
     };
 

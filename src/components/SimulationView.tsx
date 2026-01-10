@@ -1,7 +1,7 @@
 import React from 'react';
 import { Trash2 } from 'lucide-react';
 import { SimulationResult, SimulationStats } from '../hooks/useSimulation';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine, Legend } from 'recharts';
 
 // Update Props to include history actions
 interface SimulationViewProps {
@@ -391,36 +391,72 @@ export const SimulationView: React.FC<SimulationViewProps> = ({ results, distrib
 
             </div>
 
+            {/* Market Comparison Chart (New) */}
+            <div style={{
+                marginTop: '24px',
+                backgroundColor: 'rgba(255,255,255,0.4)',
+                borderRadius: '12px',
+                padding: '24px',
+                border: '1px solid rgba(0,0,0,0.05)',
+                display: 'flex',
+                flexDirection: 'column',
+                height: '350px'
+            }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-primary)' }}>Performance vs Market</h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                    Comparing your portfolio's expected median outcome against the S&P 500 benchmark.
+                </p>
+                <div style={{ flex: 1 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={results}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" vertical={false} />
+                            <XAxis
+                                dataKey="year"
+                                stroke="var(--text-tertiary)"
+                                fontSize={11}
+                                tickLine={false}
+                                axisLine={false}
+                            />
+                            <YAxis
+                                stroke="var(--text-tertiary)"
+                                fontSize={11}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={(val) => `$${val / 1000}k`}
+                                width={40}
+                            />
+                            <Tooltip
+                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                formatter={(val: number) => [`$${val.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, 'Value']}
+                                labelFormatter={(label) => `Year ${label}`}
+                            />
+                            <Legend wrapperStyle={{ fontSize: '12px', fontWeight: '600' }} iconType="circle" />
+
+                            <Line
+                                type="monotone"
+                                dataKey="medianInfo"
+                                stroke="#3b82f6"
+                                strokeWidth={3}
+                                dot={false}
+                                name="My Portfolio (Median)"
+                            />
+                            <Line
+                                type="monotone"
+                                dataKey="benchmark"
+                                stroke="#9ca3af"
+                                strokeWidth={2}
+                                strokeDasharray="5 5"
+                                dot={false}
+                                name="S&P 500 (Median)"
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+
             {/* Comparison Table */}
             {history.length > 0 && <ComparisonTable history={history} onDelete={onDelete!} />}
 
-            {/* Debug UI (Deep Debug Mode) */}
-            {stats?.riskStats?.runStats && (
-                <div style={{ marginTop: '32px', padding: '16px', background: '#2d3748', borderRadius: '8px', color: '#e2e8f0', fontFamily: 'monospace', fontSize: '11px' }}>
-                    <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#63b3ed' }}>DEBUG: Data Engine Stats</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-                        <div>
-                            <div>Mode: <span style={{ color: '#f6ad55' }}>{stats.riskStats.runStats.alignmentMode}</span></div>
-                            <div>Anchor: {stats.riskStats.runStats.anchor}</div>
-                        </div>
-                        <div>
-                            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Input Data Points:</div>
-                            {Array.isArray(stats.riskStats.runStats.tickers) && stats.riskStats.runStats.tickers.map((t: string, i: number) => (
-                                <div key={i}>{t}</div>
-                            ))}
-                        </div>
-                    </div>
-                    {stats.riskStats.runStats.calculated && (
-                        <div style={{ marginTop: '12px', borderTop: '1px solid #4a5568', paddingTop: '8px' }}>
-                            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Raw Engine Output:</div>
-                            <div>Return: {stats.riskStats.runStats.calculated.pReturn}</div>
-                            <div>Vol: {stats.riskStats.runStats.calculated.pVol}</div>
-                            <div>Beta: {stats.riskStats.runStats.calculated.beta}</div>
-                            <div>BestYear: {stats.riskStats.runStats.calculated.bestYear}</div>
-                        </div>
-                    )}
-                </div>
-            )}
         </div>
     );
 };

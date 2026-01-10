@@ -361,6 +361,8 @@ export interface PortfolioConfigItem {
 export interface PortfolioStats extends RiskStats {
     expectedReturn: number;
     volatility: number;
+    benchmarkReturn?: number;
+    benchmarkVolatility?: number;
     runStats?: any;
 }
 
@@ -480,6 +482,20 @@ export async function calculatePortfolioStats(items: PortfolioConfigItem[], peri
         pReturn: annualReturn, pVol: annualVolatility, beta: riskStats.beta
     };
 
+    let benchmarkStats = { annualReturn: 0, annualVolatility: 0 };
+
+    // Fix: Always use MAX history for Benchmark to ensure stable comparison
+    // Do NOT use alignedMarketPrices (which is sliced to period).
+    // Instead use marketStats.history directly.
+    if (marketStats && marketStats.history.length > 24) { // At least 2 years for stable stats
+        // We need dates for CAGR. marketStats.dates should exist.
+        const mPrices = marketStats.history;
+        const mDates = marketStats.dates || [];
+        if (mPrices.length === mDates.length) {
+            benchmarkStats = calculateStatsFromHistory(mPrices, mDates);
+        }
+    }
+
     const sanitize = (n: number) => {
         if (isNaN(n) || !isFinite(n)) return 0;
         return n;
@@ -493,6 +509,8 @@ export async function calculatePortfolioStats(items: PortfolioConfigItem[], peri
         bestYear: sanitize(riskStats.bestYear),
         worstYear: sanitize(riskStats.worstYear),
         beta: sanitize(riskStats.beta),
+        benchmarkReturn: sanitize(Number(benchmarkStats.annualReturn.toFixed(2))),
+        benchmarkVolatility: sanitize(Number(benchmarkStats.annualVolatility.toFixed(2))),
         runStats: debugInfo
     };
 }

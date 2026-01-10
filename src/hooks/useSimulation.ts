@@ -137,7 +137,7 @@ export const useSimulation = () => {
             const finalValues: number[] = [];
 
             // Initialize Year 0
-            const year0: SimulationResult = { year: 0, benchmark: initialValue ? initialValue : 10000 };
+            const year0: SimulationResult = { year: 0, benchmark: initialValue ? initialValue : 0 };
             for (let s = 0; s < numSimulations; s++) {
                 year0[`sim${s}`] = initialValue;
             }
@@ -244,11 +244,19 @@ export const useSimulation = () => {
 
                         // Log Return for Sharpe
                         // Log Return for MDD & BestYear
-                        const logRet = Math.log(currentPreCont / prevTotalVal);
+                        let logRet = 0;
+                        let simRet = 0;
+
+                        // Guard against 0 -> 0 growth (empty portfolio) or 0 -> positive (infinite return)
+                        // If prev is ~0, return is technically undefined or handled as 0 if current is also 0
+                        if (prevTotalVal > 0.01 && currentPreCont > 0.01) {
+                            logRet = Math.log(currentPreCont / prevTotalVal);
+                            simRet = (currentPreCont / prevTotalVal) - 1.0;
+                        }
+
                         pathSumLogRet[s] += logRet;
 
                         // Simple Return for Sharpe (Arithmetic)
-                        const simRet = (currentPreCont / prevTotalVal) - 1.0;
                         pathSumSimpleRet[s] += simRet;
                         pathSumSqSimpleRet[s] += simRet * simRet;
 
@@ -271,9 +279,15 @@ export const useSimulation = () => {
                         // Beta Logic (Time Weighted, End of Month Weight)
                         // Beta_t = W_init * Beta_init + W_month * Beta_month
                         const totalVal = currentPreCont;
-                        const wInit = valInit / totalVal;
-                        const wMonth = valMonth / totalVal;
-                        const currentBeta = wInit * betaInit + wMonth * betaMonth;
+                        let currentBeta = 1.0;
+                        if (totalVal > 0.01) {
+                            const wInit = valInit / totalVal;
+                            const wMonth = valMonth / totalVal;
+                            currentBeta = wInit * betaInit + wMonth * betaMonth;
+                        } else {
+                            // If empty, assume beta of target monthly portfolio or 1
+                            currentBeta = monthlyCost > 0 ? betaMonth : betaInit;
+                        }
                         pathSumBeta[s] += currentBeta;
 
                         // Best/Worst Year (Rolling 12M)

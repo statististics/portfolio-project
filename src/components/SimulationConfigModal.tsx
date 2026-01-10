@@ -132,8 +132,10 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
     const getMonthlyTotal = () => monthlyItems.reduce((sum, i) => sum + i.value, 0);
 
     const runSimulation = async (shouldClose: boolean = false) => {
-        if (initialItems.length === 0) {
-            alert("Please add at least one item to the Initial Portfolio.");
+
+
+        if (initialItems.length === 0 && monthlyItems.length === 0) {
+            alert("Please configure either an Initial Portfolio OR Monthly Contributions.");
             return;
         }
 
@@ -198,8 +200,8 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
     }, [dataPeriod, initialItems, monthlyItems]);
 
     const handleRun = () => {
-        if (initialItems.length === 0) {
-            alert("Please add assets to the Initial Portfolio.");
+        if (initialItems.length === 0 && monthlyItems.length === 0) {
+            alert("Please add assets to the Portfolio.");
             return;
         }
         runSimulation(true);

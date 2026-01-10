@@ -10,9 +10,12 @@ interface SimulationSidebarProps {
         numSimulations: number;
         expectedReturn: number;
         volatility: number;
+        beta?: number;
         riskStats?: any;
         dataPeriod?: string;
         benchmark?: { expectedReturn: number, volatility: number };
+        monthlyCost?: number;
+        monthlyStats?: { expectedReturn: number; volatility: number; beta?: number };
     }) => void;
     isSimulating: boolean;
 }
@@ -26,15 +29,32 @@ export const SimulationSidebar: React.FC<SimulationSidebarProps> = ({
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     // Calculated Stats State (Read Only)
-    const [stats, setStats] = useState<{ expectedReturn: number; volatility: number; dataPeriod?: string; dataPoints?: number } | null>(null);
+    const [stats, setStats] = useState<{
+        expectedReturn: number;
+        volatility: number;
+        monthlyStats?: { expectedReturn: number, volatility: number; beta?: number };
+        dataPeriod?: string;
+        dataPoints?: number
+    } | null>(null);
     const [timeHorizon, setTimeHorizon] = useState(10);
     const [numSimulations] = useState(1000); // Fixed or could be configurable
 
-    const handleRunFromModal = (data: { expectedReturn: number; volatility: number; initialValue: number; runStats?: any; dataPeriod?: string, benchmark?: { expectedReturn: number, volatility: number } }) => {
+    const handleRunFromModal = (data: {
+        expectedReturn: number;
+        volatility: number;
+        beta?: number;
+        initialValue: number;
+        monthlyCost: number;
+        runStats?: any;
+        dataPeriod?: string;
+        benchmark?: { expectedReturn: number, volatility: number };
+        monthlyStats?: { expectedReturn: number, volatility: number; beta?: number };
+    }) => {
         console.log("DEBUG: Sidebar received runStats:", data.runStats);
         setStats({
             expectedReturn: data.expectedReturn,
             volatility: data.volatility,
+            monthlyStats: data.monthlyStats,
             dataPeriod: data.dataPeriod,
             dataPoints: data.runStats?.commonDataPoints
         });
@@ -46,9 +66,12 @@ export const SimulationSidebar: React.FC<SimulationSidebarProps> = ({
             numSimulations,
             expectedReturn: data.expectedReturn,
             volatility: data.volatility,
+            beta: data.beta,
             riskStats: data.runStats,
             dataPeriod: data.dataPeriod,
-            benchmark: data.benchmark
+            benchmark: data.benchmark,
+            monthlyCost: data.monthlyCost,
+            monthlyStats: data.monthlyStats
         });
     };
 
@@ -114,32 +137,34 @@ export const SimulationSidebar: React.FC<SimulationSidebarProps> = ({
                 </button>
 
                 {stats ? (
-                    <div style={{
-                        padding: '12px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0',
-                        display: 'flex', flexDirection: 'column', gap: '8px'
-                    }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                            <span style={{ color: 'var(--text-secondary)' }}>Hist. Return</span>
-                            <div style={{ textAlign: 'right' }}>
-                                <span style={{ fontWeight: '700', color: 'var(--accent-green)' }}>{stats.expectedReturn}%</span>
-                                {stats.dataPoints && (
-                                    <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                                        (Based on last {stats.dataPoints} trading days)
-                                    </div>
-                                )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {/* Initial Seed Stats */}
+                        <div style={{ padding: '12px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                            <div style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: '8px' }}>Initial Seed Stats</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>Hist. Return</span>
+                                <span style={{ fontWeight: '700', color: 'var(--accent-green)' }}>{stats.expectedReturn.toFixed(2)}%</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>Hist. Volatility</span>
+                                <span style={{ fontWeight: '700', color: 'var(--accent-orange)' }}>{stats.volatility.toFixed(2)}%</span>
                             </div>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                            <span style={{ color: 'var(--text-secondary)' }}>Hist. Volatility</span>
-                            <div style={{ textAlign: 'right' }}>
-                                <span style={{ fontWeight: '700', color: 'var(--accent-orange)' }}>{stats.volatility}%</span>
-                                {stats.dataPoints && (
-                                    <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                                        Records: {stats.dataPoints}
-                                    </div>
-                                )}
+
+                        {/* Monthly Stats */}
+                        {stats.monthlyStats && (
+                            <div style={{ padding: '12px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: '8px' }}>Monthly Purchase Stats</div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                                    <span style={{ color: 'var(--text-secondary)' }}>Hist. Return</span>
+                                    <span style={{ fontWeight: '700', color: 'var(--accent-green)' }}>{stats.monthlyStats.expectedReturn.toFixed(2)}%</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                                    <span style={{ color: 'var(--text-secondary)' }}>Hist. Volatility</span>
+                                    <span style={{ fontWeight: '700', color: 'var(--accent-orange)' }}>{stats.monthlyStats.volatility.toFixed(2)}%</span>
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 ) : (
                     <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', textAlign: 'center', fontStyle: 'italic' }}>

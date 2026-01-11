@@ -2,6 +2,25 @@ import React, { useState } from 'react';
 import { X, Plus, Trash2, Loader2, Calculator } from 'lucide-react';
 import { calculatePortfolioStats, fetchQuote } from '../engine/market';
 
+
+
+interface ConfigItem {
+    id: string;
+    symbol: string;
+    weight: number; // Percentage 0-100
+    shares: number;
+    price: number;
+    value: number;
+    loading?: boolean;
+}
+
+export interface SimulationConfig {
+    initialItems: ConfigItem[];
+    monthlyItems: ConfigItem[];
+    initialCapital: number;
+    monthlyCapital: number;
+}
+
 interface SimulationConfigModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -15,34 +34,48 @@ interface SimulationConfigModalProps {
         dataPeriod?: string;
         benchmark?: { expectedReturn: number, volatility: number };
         monthlyStats?: { expectedReturn: number, volatility: number; beta?: number };
-    }) => void;
+    }, config: SimulationConfig) => void;
     initialTotalValue: number;
-    currentPortfolio?: { symbol: string; quantity: number }[];
-}
-
-interface ConfigItem {
-    id: string;
-    symbol: string;
-    shares: number;
-    price: number;
-    value: number;
-    loading?: boolean;
+    currentConfig?: SimulationConfig;
 }
 
 export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
     isOpen,
     onClose,
-    onRun
+    onRun,
+    currentConfig
 }) => {
     // Mode: Initial vs Monthly
     const [activeTab, setActiveTab] = useState<'initial' | 'monthly'>('initial');
+
+    // Capital Inputs
+    const [initialCapital, setInitialCapital] = useState<number>(10000);
+    const [monthlyCapital, setMonthlyCapital] = useState<number>(500);
 
     // Two separate lists
     const [initialItems, setInitialItems] = useState<ConfigItem[]>([]);
     const [monthlyItems, setMonthlyItems] = useState<ConfigItem[]>([]);
 
+    // Initialize from props when opening
+    React.useEffect(() => {
+        if (isOpen && currentConfig) {
+            setInitialCapital(currentConfig.initialCapital);
+            setMonthlyCapital(currentConfig.monthlyCapital);
+            setInitialItems(currentConfig.initialItems);
+            setMonthlyItems(currentConfig.monthlyItems);
+        } else if (isOpen && !currentConfig) {
+            // Reset if no config provided (fresh start)
+            setInitialCapital(10000);
+            setMonthlyCapital(500);
+            setInitialItems([]);
+            setMonthlyItems([]);
+            setPreviewInitial(null);
+            setPreviewMonthly(null);
+        }
+    }, [isOpen, currentConfig]);
+
     const [newSymbol, setNewSymbol] = useState('');
-    const [newShares, setNewShares] = useState(0);
+    const [newWeight, setNewWeight] = useState<number>(0); // Weight in %
     const [calculating, setCalculating] = useState(false);
     const [addingTicker, setAddingTicker] = useState(false);
 
@@ -52,11 +85,33 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
     const [previewInitial, setPreviewInitial] = useState<{ ret: number, vol: number } | null>(null);
     const [previewMonthly, setPreviewMonthly] = useState<{ ret: number, vol: number } | null>(null);
 
+    // Recalculate Shares based on Weights and Capital
+    const updateShares = (items: ConfigItem[], totalCap: number): ConfigItem[] => {
+        return items.map(item => {
+            const allocation = totalCap * (item.weight / 100);
+            return {
+                ...item,
+                value: allocation,
+                shares: item.price > 0 ? allocation / item.price : 0
+            };
+        });
+    };
+
+    // Effect: Update Shares whenever Capital changes
+    React.useEffect(() => {
+        setInitialItems(prev => updateShares(prev, initialCapital));
+    }, [initialCapital]);
+
+    React.useEffect(() => {
+        setMonthlyItems(prev => updateShares(prev, monthlyCapital));
+    }, [monthlyCapital]);
+
+
     // Effect: Recalculate Stats on change
     React.useEffect(() => {
         const calc = async () => {
             if (initialItems.length > 0) {
-                const valid = initialItems.map(i => ({ symbol: i.symbol, shares: i.shares }));
+                const valid = initialItems.map(i => ({ symbol: i.symbol, shares: i.shares })); // Stats engine still needs shares
                 const s = await calculatePortfolioStats(valid, dataPeriod);
                 setPreviewInitial({ ret: s.expectedReturn, vol: s.volatility });
             } else {
@@ -72,10 +127,10 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
             }
         };
         calc();
-    }, [initialItems, monthlyItems, dataPeriod]);
+    }, [initialItems, monthlyItems, dataPeriod]); // items update when weights/capital change
 
     const handleAddItem = async () => {
-        if (!newSymbol || newShares <= 0) return;
+        if (!newSymbol || newWeight <= 0) return;
         setAddingTicker(true);
 
         try {
@@ -84,23 +139,29 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
             if (!quote) throw new Error("Quote not found");
             const price = quote.price;
 
+            // Check current total weight to warn or cap? 
+            // For now, just add. User must manage to 100%.
+
             const newItem: ConfigItem = {
                 id: Date.now().toString(),
                 symbol: sym,
-                shares: newShares,
+                weight: newWeight,
+                shares: 0, // Will be calc below
                 price: price,
-                value: price * newShares,
+                value: 0, // Will be calc below
                 loading: false
             };
 
             if (activeTab === 'initial') {
-                setInitialItems(prev => [...prev, newItem]);
+                const updatedList = [...initialItems, newItem];
+                setInitialItems(updateShares(updatedList, initialCapital));
             } else {
-                setMonthlyItems(prev => [...prev, newItem]);
+                const updatedList = [...monthlyItems, newItem];
+                setMonthlyItems(updateShares(updatedList, monthlyCapital));
             }
 
             setNewSymbol('');
-            setNewShares(0);
+            setNewWeight(0);
         } catch (e) {
             console.error("Failed to fetch price", e);
             alert("Could not fetch price for " + newSymbol);
@@ -111,39 +172,55 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
 
     const handleRemoveItem = (id: string) => {
         if (activeTab === 'initial') {
-            setInitialItems(initialItems.filter(i => i.id !== id));
+            setInitialItems(prev => {
+                const filtered = prev.filter(i => i.id !== id);
+                return updateShares(filtered, initialCapital);
+            });
         } else {
-            setMonthlyItems(monthlyItems.filter(i => i.id !== id));
+            setMonthlyItems(prev => {
+                const filtered = prev.filter(i => i.id !== id);
+                return updateShares(filtered, monthlyCapital);
+            });
         }
     };
 
-    const handleSync = () => {
-        // Copy Initial -> Monthly
-        // We need deep copy of items with new IDs
-        const copied = initialItems.map(item => ({
-            ...item,
-            id: Date.now() + Math.random().toString()
-        }));
-        setMonthlyItems(copied);
-        alert("Synced! Monthly purchases now match initial holdings.");
+    const handleAutoRebalance = () => {
+        const currentItems = activeTab === 'initial' ? initialItems : monthlyItems;
+        if (currentItems.length === 0) return;
+
+        const count = currentItems.length;
+        const equalWeight = 100 / count;
+
+        if (activeTab === 'initial') {
+            const rebalanced = initialItems.map(i => ({ ...i, weight: equalWeight }));
+            setInitialItems(updateShares(rebalanced, initialCapital));
+        } else {
+            const rebalanced = monthlyItems.map(i => ({ ...i, weight: equalWeight }));
+            setMonthlyItems(updateShares(rebalanced, monthlyCapital));
+        }
     };
 
-    const getInitialTotal = () => initialItems.reduce((sum, i) => sum + i.value, 0);
-    const getMonthlyTotal = () => monthlyItems.reduce((sum, i) => sum + i.value, 0);
-
     const runSimulation = async (shouldClose: boolean = false) => {
-
-
         if (initialItems.length === 0 && monthlyItems.length === 0) {
             alert("Please configure either an Initial Portfolio OR Monthly Contributions.");
             return;
         }
 
+        // Validate Weights
+        const totalWInitial = initialItems.reduce((s, i) => s + i.weight, 0);
+        const totalWMonthly = monthlyItems.reduce((s, i) => s + i.weight, 0);
+
+        if (initialItems.length > 0 && Math.abs(totalWInitial - 100) > 1) {
+            alert(`Initial Portfolio weights sum to ${totalWInitial.toFixed(1)}%. They should be ~100%.`);
+            return;
+        }
+        if (monthlyItems.length > 0 && Math.abs(totalWMonthly - 100) > 1) {
+            alert(`Monthly Contribution weights sum to ${totalWMonthly.toFixed(1)}%. They should be ~100%.`);
+            return;
+        }
+
         setCalculating(true);
         try {
-            const totalInitial = getInitialTotal();
-            const totalMonthly = getMonthlyTotal();
-
             // Calculate Stats based on INITIAL Portfolio mixing
             // 1. Initial Portfolio Stats
             const validInitial = initialItems.map(i => ({ symbol: i.symbol, shares: i.shares }));
@@ -170,13 +247,19 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
                     beta: statsMonthly.beta
                 },
 
-                initialValue: totalInitial,
-                monthlyCost: totalMonthly,
+                initialValue: initialCapital,
+                // FIX: If no monthly portfolio items, treat monthlyCost as 0 (don't auto-invest in benchmark)
+                monthlyCost: monthlyItems.length > 0 ? monthlyCapital : 0,
                 dataPeriod: dataPeriod,
                 benchmark: (statsInitial.benchmarkReturn && statsInitial.benchmarkVolatility) ? {
                     expectedReturn: statsInitial.benchmarkReturn,
                     volatility: statsInitial.benchmarkVolatility
                 } : undefined
+            }, {
+                initialItems,
+                monthlyItems,
+                initialCapital,
+                monthlyCapital
             });
 
             if (shouldClose) onClose();
@@ -191,13 +274,14 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
 
     // Render Helper
     const currentItems = activeTab === 'initial' ? initialItems : monthlyItems;
+    const currentTotalWeight = currentItems.reduce((sum, i) => sum + i.weight, 0);
 
     // Reactive Update: Recalculate whenever Period or Items change
     React.useEffect(() => {
         if (initialItems.length > 0) {
             runSimulation(false);
         }
-    }, [dataPeriod, initialItems, monthlyItems]);
+    }, [dataPeriod, initialItems, monthlyItems]); // Debounce?
 
     const handleRun = () => {
         if (initialItems.length === 0 && monthlyItems.length === 0) {
@@ -208,9 +292,6 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
     };
 
     if (!isOpen) return null;
-
-    const totalInitial = getInitialTotal();
-    const totalMonthly = getMonthlyTotal();
 
     return (
         <div style={{
@@ -253,7 +334,7 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
                                 Portfolio Config
                             </h2>
                             <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', margin: '4px 0 0 0' }}>
-                                Configure Initial Seed & Monthly Contributions
+                                Configure Allocation by Weight (%)
                             </p>
                         </div>
                     </div>
@@ -298,12 +379,31 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
 
                 {/* SUMMARY HEADER based on Active Tab */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                    <div>
-                        <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
-                            {activeTab === 'initial' ? 'Total Initial Capital' : 'Est. Monthly Cost'}
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                            {activeTab === 'initial' ? 'Total Initial Capital' : 'Total Monthly Contribution'}
                         </div>
-                        <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
-                            ${(activeTab === 'initial' ? totalInitial : totalMonthly).toLocaleString()}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>$</span>
+                            <input
+                                type="number"
+                                value={activeTab === 'initial' ? initialCapital : monthlyCapital}
+                                onChange={(e) => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    activeTab === 'initial' ? setInitialCapital(val) : setMonthlyCapital(val);
+                                }}
+                                style={{
+                                    fontSize: '32px',
+                                    fontWeight: '800',
+                                    color: 'var(--text-primary)',
+                                    letterSpacing: '-0.03em',
+                                    border: 'none',
+                                    outline: 'none',
+                                    background: 'transparent',
+                                    width: '200px',
+                                    borderBottom: '1px dashed rgba(0,0,0,0.2)'
+                                }}
+                            />
                         </div>
 
                         {/* Live Stats Preview */}
@@ -338,23 +438,32 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
                         </div>
                     </div>
 
-                    {activeTab === 'monthly' && (
-                        <button
-                            onClick={handleSync}
-                            style={{
-                                padding: '8px 12px',
-                                fontSize: '12px',
-                                borderRadius: '8px',
-                                border: '1px solid rgba(0,0,0,0.1)',
-                                background: 'white',
-                                cursor: 'pointer',
-                                fontWeight: '600',
-                                color: 'var(--text-secondary)'
-                            }}
-                        >
-                            Sync from Initial
-                        </button>
-                    )}
+                    <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: currentTotalWeight > 100 ? 'var(--accent-red)' : 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                            Total Allocation
+                        </div>
+                        <div style={{ fontSize: '24px', fontWeight: '800', color: currentTotalWeight > 100 ? 'var(--accent-red)' : 'var(--text-primary)' }}>
+                            {currentTotalWeight.toFixed(1)}%
+                        </div>
+                        {currentItems.length > 0 && (
+                            <button
+                                onClick={handleAutoRebalance}
+                                style={{
+                                    marginTop: '8px',
+                                    padding: '6px 10px',
+                                    fontSize: '11px',
+                                    borderRadius: '6px',
+                                    border: '1px solid rgba(0,0,0,0.1)',
+                                    background: 'var(--bg-secondary)',
+                                    cursor: 'pointer',
+                                    fontWeight: '600',
+                                    color: 'var(--text-primary)'
+                                }}
+                            >
+                                Auto-Rebalance
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 {/* ADD ASSET FORM */}
@@ -378,9 +487,9 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
                     <div style={{ width: '120px' }}>
                         <input
                             type="number"
-                            placeholder="Shares"
-                            value={newShares || ''}
-                            onChange={e => setNewShares(parseFloat(e.target.value))}
+                            placeholder="Weight %"
+                            value={newWeight || ''}
+                            onChange={e => setNewWeight(parseFloat(e.target.value))}
                             onKeyDown={e => e.key === 'Enter' && handleAddItem()}
                             style={{
                                 width: '100%', padding: '12px 16px', borderRadius: '12px',
@@ -408,7 +517,7 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
                 <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {currentItems.length === 0 ? (
                         <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-tertiary)', fontSize: '14px' }}>
-                            No assets configured for {activeTab === 'initial' ? 'Initial Seed' : 'Monthly Purchase'}.
+                            No assets configured. Add symbols to build your portfolio.
                         </div>
                     ) : (
                         currentItems.map(item => (
@@ -428,10 +537,10 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
                                     </div>
                                     <div>
                                         <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
-                                            {item.shares} shares
+                                            {item.weight.toFixed(1)}%
                                         </div>
                                         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                                            @ ${item.price.toFixed(2)}
+                                            {item.shares.toFixed(2)} shares @ ${item.price.toFixed(2)}
                                         </div>
                                     </div>
                                 </div>
@@ -441,7 +550,7 @@ export const SimulationConfigModal: React.FC<SimulationConfigModalProps> = ({
                                             ${item.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                         </div>
                                         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                                            Current Value
+                                            Allocated
                                         </div>
                                     </div>
                                     <button

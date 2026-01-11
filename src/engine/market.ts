@@ -294,7 +294,7 @@ function calculateRiskMetrics(portfolioHistory: number[], portfolioDates: string
 
 async function fetchAssetStats(symbol: string): Promise<AssetStats> {
     const cleanSymbol = symbol.toUpperCase().trim();
-    const cacheKey = `av_stats_v6_${cleanSymbol}`; // Bump v6
+    const cacheKey = `av_stats_v7_${cleanSymbol}`; // Bump v7 for 40Y support
 
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
@@ -315,7 +315,8 @@ async function fetchAssetStats(symbol: string): Promise<AssetStats> {
         // If underlying logic is needed we can add it back, but let's prioritize correct math first.
 
         console.log(`Fetching history for ${cleanSymbol}...`);
-        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY_ADJUSTED&symbol=${cleanSymbol}&apikey=${AV_API_KEY}`;
+        // Use outputsize=full to get 20+ years of data
+        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY_ADJUSTED&symbol=${cleanSymbol}&outputsize=full&apikey=${AV_API_KEY}`;
         const res = await fetchWithTimeout(url, 6000);
         const data: AVMonthlyResponse = await res.json();
 
@@ -325,7 +326,7 @@ async function fetchAssetStats(symbol: string): Promise<AssetStats> {
         const dates = Object.keys(timeSeries).sort();
         const prices = dates.map(d => parseFloat(timeSeries[d]["5. adjusted close"])).filter(n => !isNaN(n));
 
-        const MAX_POINTS = 240; // 20 years (monthly)
+        const MAX_POINTS = 480; // 40 years (monthly)
         const recentPrices = prices.slice(-MAX_POINTS);
         const recentDates = dates.slice(-MAX_POINTS);
 

@@ -9,12 +9,18 @@ interface SimulationViewProps {
     results: SimulationResult[];
     distribution: { range: string; count: number }[];
     stats: SimulationStats | null;
+
+    // Comparison Props
+    resultsB?: SimulationResult[];
+    distributionB?: { range: string; count: number }[];
+    statsB?: SimulationStats | null;
+
     history?: any[]; // Avoiding circular import of SimulationRun for now, or just use any
     onSave?: (name: string) => void;
     onDelete?: (id: string) => void;
 }
 
-const StatCard = ({ label, value, subtext, color = 'var(--text-primary)' }: { label: string, value: string, subtext?: string, color?: string }) => (
+const StatCard = ({ label, valueA, valueB, subtext, color = 'var(--text-primary)' }: { label: string, valueA: string, valueB?: string, subtext?: string, color?: string }) => (
     <div style={{
         flex: 1,
         padding: '24px',
@@ -27,10 +33,52 @@ const StatCard = ({ label, value, subtext, color = 'var(--text-primary)' }: { la
         <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em' }}>
             {label}
         </div>
-        <div style={{ fontSize: '24px', fontWeight: '800', marginTop: '8px', color: color }}>
-            {value}
-        </div>
+
+        {valueB ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent-blue)', backgroundColor: 'rgba(59, 130, 246, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>A</span>
+                    <span style={{ fontSize: '20px', fontWeight: '800', color: color }}>{valueA}</span>
+                </div>
+                <div style={{ height: '1px', width: '100%', backgroundColor: 'rgba(0,0,0,0.05)' }}></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#f97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>B</span>
+                    <span style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-primary)' }}>{valueB}</span>
+                </div>
+            </div>
+        ) : (
+            <div style={{ fontSize: '24px', fontWeight: '800', marginTop: '8px', color: color }}>
+                {valueA}
+            </div>
+        )}
+
         {subtext && <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px' }}>{subtext}</div>}
+    </div >
+);
+
+const RiskCard = ({ label, valueA, valueB, subtext, colorA = 'var(--text-primary)', colorB = 'var(--text-primary)', bgColor = 'white', borderColor = 'rgba(0,0,0,0.05)' }: { label: string, valueA: string, valueB?: string, subtext?: string, colorA?: string, colorB?: string, bgColor?: string, borderColor?: string }) => (
+    <div style={{ padding: '16px', backgroundColor: bgColor, borderRadius: '12px', border: `1px solid ${borderColor}` }}>
+        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '8px' }}>{label}</div>
+
+        {valueB ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--accent-blue)', backgroundColor: 'rgba(59, 130, 246, 0.1)', padding: '1px 4px', borderRadius: '4px' }}>A</span>
+                    <span style={{ fontSize: '16px', fontWeight: '800', color: colorA }}>{valueA}</span>
+                </div>
+                <div style={{ height: '1px', width: '100%', backgroundColor: 'rgba(0,0,0,0.05)' }}></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    <span style={{ fontSize: '10px', fontWeight: '700', color: '#f97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', padding: '1px 4px', borderRadius: '4px' }}>B</span>
+                    <span style={{ fontSize: '16px', fontWeight: '800', color: colorB }}>{valueB}</span>
+                </div>
+            </div>
+        ) : (
+            <div style={{ fontSize: '18px', fontWeight: '800', color: colorA }}>
+                {valueA}
+            </div>
+        )}
+
+        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', opacity: 0.8, marginTop: '6px' }}>{subtext}</div>
     </div>
 );
 
@@ -100,7 +148,7 @@ const ComparisonTable = ({ history, onDelete }: { history: any[], onDelete: (id:
                                     transition: 'transform 0.2s ease, box-shadow 0.2s ease',
                                     cursor: 'default'
                                 }}>
-                                    <td style={{ padding: '16px', borderRadius: '12px 0 0 12px', fontWeight: '600', color: 'var(--text-primary)', fontSize: '14px' }}>
+                                    <td style={{ padding: '16px', borderRadius: '12px 0 0 12px', fontWeight: '600', color: 'var(--text-primary)', fontSize: '12px' }}>
                                         {run.name}
                                         {isDca && <span style={{ fontSize: '10px', marginLeft: '6px', color: 'var(--text-tertiary)', fontWeight: '400' }}>(DCA)</span>}
                                     </td>
@@ -217,7 +265,7 @@ const CustomScenarioTooltip = ({ active, payload, label }: any) => {
     );
 };
 
-export const SimulationView: React.FC<SimulationViewProps> = ({ results, distribution, stats, history = [], onSave, onDelete }) => {
+export const SimulationView: React.FC<SimulationViewProps> = ({ results, distribution, stats, resultsB, statsB, history = [], onSave, onDelete }) => {
 
     if (!results || results.length === 0) {
         return (
@@ -261,22 +309,26 @@ export const SimulationView: React.FC<SimulationViewProps> = ({ results, distrib
             </div>
 
             {/* Stats Row */}
+            {/* Stats Row */}
             {stats && (
                 <div style={{ display: 'flex', gap: '20px', marginBottom: '32px' }}>
                     <StatCard
                         label="Success Probability"
-                        value={`${stats.successRate.toFixed(1)}%`}
+                        valueA={`${stats.successRate.toFixed(1)}%`}
+                        valueB={statsB ? `${statsB.successRate.toFixed(1)}%` : undefined}
                         subtext={stats.targetGoal ? `Chance of reaching > $${stats.targetGoal.toLocaleString()}` : "Chance of Profit"}
                         color={stats.successRate > 80 ? 'var(--accent-green)' : stats.successRate > 50 ? 'var(--accent-orange)' : 'var(--accent-red)'}
                     />
                     <StatCard
                         label="Median Outcome"
-                        value={`$${stats.median.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                        valueA={`$${stats.median.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                        valueB={statsB ? `$${statsB.median.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : undefined}
                         subtext="Expected Portfolio Value"
                     />
                     <StatCard
                         label="Worst Case (5%)"
-                        value={`$${stats.worstCase.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                        valueA={`$${stats.worstCase.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                        valueB={statsB ? `$${statsB.worstCase.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : undefined}
                         subtext="95% confident it handles better"
                         color={stats.worstCase >= stats.initialValue ? 'var(--accent-green)' : 'var(--accent-red)'}
                     />
@@ -302,49 +354,64 @@ export const SimulationView: React.FC<SimulationViewProps> = ({ results, distrib
                             gap: '12px'
                         }}>
                             {/* MDD */}
-                            <div style={{ padding: '16px', backgroundColor: '#fff5f5', borderRadius: '12px', border: '1px solid #fed7d7' }}>
-                                <div style={{ fontSize: '12px', color: '#e53e3e', fontWeight: '600', marginBottom: '4px' }}>Max Drawdown</div>
-                                <div style={{ fontSize: '18px', fontWeight: '800', color: '#c53030' }}>
-                                    {(stats.portfolioMDD! * 100).toFixed(2)}%
-                                </div>
-                                <div style={{ fontSize: '10px', color: '#e53e3e', opacity: 0.8 }}>Projected Peak-to-Trough</div>
-                            </div>
+                            <RiskCard
+                                label="Max Drawdown"
+                                valueA={`${(stats.portfolioMDD! * 100).toFixed(2)}%`}
+                                valueB={statsB?.portfolioMDD ? `${(statsB.portfolioMDD * 100).toFixed(2)}%` : undefined}
+                                subtext="Projected Peak-to-Trough"
+                                colorA="#c53030"
+                                colorB="#c53030"
+                                bgColor="#fff5f5"
+                                borderColor="#fed7d7"
+                            />
 
                             {/* Sharpe */}
-                            <div style={{ padding: '16px', backgroundColor: '#f0fff4', borderRadius: '12px', border: '1px solid #c6f6d5' }}>
-                                <div style={{ fontSize: '12px', color: '#2f855a', fontWeight: '600', marginBottom: '4px' }}>Sharpe Ratio</div>
-                                <div style={{ fontSize: '18px', fontWeight: '800', color: '#22543d' }}>
-                                    {stats.portfolioSharpe!.toFixed(2)}
-                                </div>
-                                <div style={{ fontSize: '10px', color: '#2f855a', opacity: 0.8 }}>DCA Adjusted</div>
-                            </div>
+                            <RiskCard
+                                label="Sharpe Ratio"
+                                valueA={stats.portfolioSharpe!.toFixed(2)}
+                                valueB={statsB?.portfolioSharpe ? statsB.portfolioSharpe.toFixed(2) : undefined}
+                                subtext="DCA Adjusted"
+                                colorA="#22543d"
+                                colorB="#22543d"
+                                bgColor="#f0fff4"
+                                borderColor="#c6f6d5"
+                            />
 
                             {/* Beta */}
-                            <div style={{ padding: '16px', backgroundColor: '#ebf8ff', borderRadius: '12px', border: '1px solid #bee3f8' }}>
-                                <div style={{ fontSize: '12px', color: '#3182ce', fontWeight: '600', marginBottom: '4px' }}>Beta (vs SPY)</div>
-                                <div style={{ fontSize: '18px', fontWeight: '800', color: '#2b6cb0' }}>
-                                    {stats.portfolioBeta!.toFixed(2)}
-                                </div>
-                                <div style={{ fontSize: '10px', color: '#3182ce', opacity: 0.8 }}>Weighted Avg</div>
-                            </div>
+                            <RiskCard
+                                label="Beta (vs SPY)"
+                                valueA={stats.portfolioBeta!.toFixed(2)}
+                                valueB={statsB?.portfolioBeta ? statsB.portfolioBeta.toFixed(2) : undefined}
+                                subtext="Weighted Avg"
+                                colorA="#2b6cb0"
+                                colorB="#2b6cb0"
+                                bgColor="#ebf8ff"
+                                borderColor="#bee3f8"
+                            />
 
                             {/* Best Year */}
-                            <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '4px' }}>Best Year</div>
-                                <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--accent-green)' }}>
-                                    +{(stats.portfolioBestYear! * 100).toFixed(1)}%
-                                </div>
-                                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>Rolling 12M</div>
-                            </div>
+                            <RiskCard
+                                label="Best Year"
+                                valueA={`+${(stats.portfolioBestYear! * 100).toFixed(1)}%`}
+                                valueB={statsB?.portfolioBestYear ? `+${(statsB.portfolioBestYear * 100).toFixed(1)}%` : undefined}
+                                subtext="Rolling 12M"
+                                colorA="var(--accent-green)"
+                                colorB="var(--accent-green)"
+                                bgColor="#f8fafc"
+                                borderColor="#e2e8f0"
+                            />
 
                             {/* Worst Year */}
-                            <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '4px' }}>Worst Year</div>
-                                <div style={{ fontSize: '18px', fontWeight: '800', color: stats.portfolioWorstYear! >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-                                    {(stats.portfolioWorstYear! * 100).toFixed(1)}%
-                                </div>
-                                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>Rolling 12M</div>
-                            </div>
+                            <RiskCard
+                                label="Worst Year"
+                                valueA={`${(stats.portfolioWorstYear! * 100).toFixed(1)}%`}
+                                valueB={statsB?.portfolioWorstYear ? `${(statsB.portfolioWorstYear * 100).toFixed(1)}%` : undefined}
+                                subtext="Rolling 12M"
+                                colorA={stats.portfolioWorstYear! >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}
+                                colorB={statsB?.portfolioWorstYear && statsB.portfolioWorstYear >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}
+                                bgColor="#f8fafc"
+                                borderColor="#e2e8f0"
+                            />
                         </div>
                     </div>
                 ) : (
@@ -365,160 +432,177 @@ export const SimulationView: React.FC<SimulationViewProps> = ({ results, distrib
                                 gap: '12px'
                             }}>
                                 {/* MDD */}
-                                <div style={{ padding: '16px', backgroundColor: '#fff5f5', borderRadius: '12px', border: '1px solid #fed7d7' }}>
-                                    <div style={{ fontSize: '12px', color: '#e53e3e', fontWeight: '600', marginBottom: '4px' }}>Max Drawdown</div>
-                                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#c53030' }}>
-                                        {stats.riskStats.maxDrawdown.toFixed(2)}%
-                                    </div>
-                                    <div style={{ fontSize: '10px', color: '#e53e3e', opacity: 0.8 }}>Historical Peak-to-Trough</div>
-                                </div>
+                                <RiskCard
+                                    label="Max Drawdown"
+                                    valueA={`${stats.riskStats.maxDrawdown.toFixed(2)}%`}
+                                    valueB={statsB?.riskStats ? `${statsB.riskStats.maxDrawdown.toFixed(2)}%` : undefined}
+                                    subtext="Historical Peak-to-Trough"
+                                    colorA="#c53030"
+                                    colorB="#c53030"
+                                    bgColor="#fff5f5"
+                                    borderColor="#fed7d7"
+                                />
 
                                 {/* Sharpe */}
-                                <div style={{ padding: '16px', backgroundColor: '#f0fff4', borderRadius: '12px', border: '1px solid #c6f6d5' }}>
-                                    <div style={{ fontSize: '12px', color: '#2f855a', fontWeight: '600', marginBottom: '4px' }}>Sharpe Ratio</div>
-                                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#22543d' }}>
-                                        {stats.riskStats.sharpeRatio?.toFixed(2) ?? 'N/A'}
-                                    </div>
-                                    <div style={{ fontSize: '10px', color: '#2f855a', opacity: 0.8 }}>Risk-adj. Return</div>
-                                </div>
+                                <RiskCard
+                                    label="Sharpe Ratio"
+                                    valueA={stats.riskStats.sharpeRatio?.toFixed(2) ?? 'N/A'}
+                                    valueB={statsB?.riskStats ? (statsB.riskStats.sharpeRatio?.toFixed(2) ?? 'N/A') : undefined}
+                                    subtext="Risk-adj. Return"
+                                    colorA="#22543d"
+                                    colorB="#22543d"
+                                    bgColor="#f0fff4"
+                                    borderColor="#c6f6d5"
+                                />
 
                                 {/* Beta */}
-                                <div style={{ padding: '16px', backgroundColor: '#ebf8ff', borderRadius: '12px', border: '1px solid #bee3f8' }}>
-                                    <div style={{ fontSize: '12px', color: '#3182ce', fontWeight: '600', marginBottom: '4px' }}>Beta (vs SPY)</div>
-                                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#2b6cb0' }}>
-                                        {stats.riskStats.beta?.toFixed(2) ?? '1.00'}
-                                    </div>
-                                    <div style={{ fontSize: '10px', color: '#3182ce', opacity: 0.8 }}>Market correlation</div>
-                                </div>
+                                <RiskCard
+                                    label="Beta (vs SPY)"
+                                    valueA={stats.riskStats.beta?.toFixed(2) ?? '1.00'}
+                                    valueB={statsB?.riskStats ? (statsB.riskStats.beta?.toFixed(2) ?? '1.00') : undefined}
+                                    subtext="Market correlation"
+                                    colorA="#2b6cb0"
+                                    colorB="#2b6cb0"
+                                    bgColor="#ebf8ff"
+                                    borderColor="#bee3f8"
+                                />
 
                                 {/* Best Year */}
-                                <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '4px' }}>Best Year</div>
-                                    <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--accent-green)' }}>
-                                        {stats.riskStats.bestYear > 0 ? '+' : ''}{stats.riskStats.bestYear.toFixed(1)}%
-                                    </div>
-                                    <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>Hist. Best 12M</div>
-                                </div>
+                                <RiskCard
+                                    label="Best Year"
+                                    valueA={`${stats.riskStats.bestYear > 0 ? '+' : ''}${stats.riskStats.bestYear.toFixed(1)}%`}
+                                    valueB={statsB?.riskStats ? `${statsB.riskStats.bestYear > 0 ? '+' : ''}${statsB.riskStats.bestYear.toFixed(1)}%` : undefined}
+                                    subtext="Hist. Best 12M"
+                                    colorA="var(--accent-green)"
+                                    colorB="var(--accent-green)"
+                                    bgColor="#f8fafc"
+                                    borderColor="#e2e8f0"
+                                />
 
                                 {/* Worst Year */}
-                                <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '4px' }}>Worst Year</div>
-                                    <div style={{ fontSize: '18px', fontWeight: '800', color: stats.riskStats.worstYear >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-                                        {stats.riskStats.worstYear > 0 ? '+' : ''}{stats.riskStats.worstYear.toFixed(1)}%
-                                    </div>
-                                    <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>Hist. Worst 12M</div>
-                                </div>
+                                <RiskCard
+                                    label="Worst Year"
+                                    valueA={`${stats.riskStats.worstYear > 0 ? '+' : ''}${stats.riskStats.worstYear.toFixed(1)}%`}
+                                    valueB={statsB?.riskStats ? `${statsB.riskStats.worstYear > 0 ? '+' : ''}${statsB.riskStats.worstYear.toFixed(1)}%` : undefined}
+                                    subtext="Hist. Worst 12M"
+                                    colorA={stats.riskStats.worstYear >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}
+                                    colorB={statsB?.riskStats && statsB.riskStats.worstYear >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}
+                                    bgColor="#f8fafc"
+                                    borderColor="#e2e8f0"
+                                />
                             </div>
                         </div>
                     )
                 )
             )}
 
-            {/* Charts Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: '24px', height: '400px' }}>
+            {/* Charts Grid - Only show in Single Mode */}
+            {!resultsB && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: '24px', height: '400px' }}>
 
-                {/* Line Chart */}
-                <div style={{
-                    backgroundColor: 'rgba(255,255,255,0.4)',
-                    borderRadius: '12px',
-                    padding: '24px',
-                    border: '1px solid rgba(0,0,0,0.05)',
-                    display: 'flex',
-                    flexDirection: 'column'
-                }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <h3 style={{ fontSize: '14px', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>Growth Scenarios</h3>
-                        {stats?.targetGoal && (
-                            <div style={{ fontSize: '11px', color: 'var(--accent-green)', fontWeight: '600' }}>
-                                --- Target: ${stats.targetGoal.toLocaleString()}
-                            </div>
-                        )}
-                    </div>
+                    {/* Line Chart */}
+                    <div style={{
+                        backgroundColor: 'rgba(255,255,255,0.4)',
+                        borderRadius: '12px',
+                        padding: '24px',
+                        border: '1px solid rgba(0,0,0,0.05)',
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <h3 style={{ fontSize: '14px', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>Growth Scenarios</h3>
+                            {stats?.targetGoal && (
+                                <div style={{ fontSize: '11px', color: 'var(--accent-green)', fontWeight: '600' }}>
+                                    --- Target: ${stats.targetGoal.toLocaleString()}
+                                </div>
+                            )}
+                        </div>
 
-                    <div style={{ flex: 1 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={results}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" vertical={false} />
-                                <XAxis
-                                    dataKey="year"
-                                    stroke="var(--text-tertiary)"
-                                    fontSize={11}
-                                    tickLine={false}
-                                    axisLine={false}
-                                />
-                                <YAxis
-                                    stroke="var(--text-tertiary)"
-                                    fontSize={11}
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickFormatter={(val) => `$${val / 1000}k`}
-                                    width={40}
-                                />
-                                <Tooltip content={<CustomScenarioTooltip />} />
-                                {keys.map((key) => (
-                                    <Line
-                                        key={key}
-                                        type="monotone"
-                                        dataKey={key}
-                                        stroke="#3b82f6"
-                                        strokeWidth={1}
-                                        dot={false}
-                                        strokeOpacity={0.15}
-                                        activeDot={{ r: 4 }}
+                        <div style={{ flex: 1 }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={results}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" vertical={false} />
+                                    <XAxis
+                                        dataKey="year"
+                                        stroke="var(--text-tertiary)"
+                                        fontSize={11}
+                                        tickLine={false}
+                                        axisLine={false}
                                     />
-                                ))}
-                                {stats?.targetGoal && (
-                                    <ReferenceLine
-                                        y={stats.targetGoal}
-                                        stroke="var(--accent-green)"
-                                        strokeDasharray="4 4"
-                                        strokeWidth={2}
-                                        label={{
-                                            value: 'GOAL',
-                                            position: 'right',
-                                            fill: 'var(--accent-green)',
-                                            fontSize: 10,
-                                            fontWeight: 700
-                                        }}
+                                    <YAxis
+                                        stroke="var(--text-tertiary)"
+                                        fontSize={11}
+                                        tickLine={false}
+                                        axisLine={false}
+                                        tickFormatter={(val) => `$${val / 1000}k`}
+                                        width={40}
                                     />
-                                )}
-                            </LineChart>
-                        </ResponsiveContainer>
+                                    <Tooltip content={<CustomScenarioTooltip />} />
+                                    {keys.map((key) => (
+                                        <Line
+                                            key={key}
+                                            type="monotone"
+                                            dataKey={key}
+                                            stroke="#3b82f6"
+                                            strokeWidth={1}
+                                            dot={false}
+                                            strokeOpacity={0.15}
+                                            activeDot={{ r: 4 }}
+                                        />
+                                    ))}
+                                    {stats?.targetGoal && (
+                                        <ReferenceLine
+                                            y={stats.targetGoal}
+                                            stroke="var(--accent-green)"
+                                            strokeDasharray="4 4"
+                                            strokeWidth={2}
+                                            label={{
+                                                value: 'GOAL',
+                                                position: 'right',
+                                                fill: 'var(--accent-green)',
+                                                fontSize: 10,
+                                                fontWeight: 700
+                                            }}
+                                        />
+                                    )}
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
-                </div>
 
-                {/* Histogram */}
-                <div style={{
-                    backgroundColor: 'rgba(255,255,255,0.4)',
-                    borderRadius: '12px',
-                    padding: '24px',
-                    border: '1px solid rgba(0,0,0,0.05)',
-                    display: 'flex',
-                    flexDirection: 'column'
-                }}>
-                    <h3 style={{ fontSize: '14px', fontWeight: '700', marginBottom: '16px', color: 'var(--text-primary)' }}>Final Value Distribution</h3>
-                    <div style={{ flex: 1 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={distribution} layout="vertical">
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" horizontal={false} />
-                                <XAxis type="number" hide />
-                                <YAxis
-                                    dataKey="range"
-                                    type="category"
-                                    width={80}
-                                    tick={{ fontSize: 10, fill: 'var(--text-secondary)' }}
-                                    interval={0}
-                                    axisLine={false}
-                                    tickLine={false}
-                                />
-                                <Tooltip cursor={{ fill: 'rgba(0,0,0,0.03)' }} />
-                                <Bar dataKey="count" fill="var(--text-primary)" radius={[0, 4, 4, 0]} barSize={10} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                    {/* Histogram */}
+                    <div style={{
+                        backgroundColor: 'rgba(255,255,255,0.4)',
+                        borderRadius: '12px',
+                        padding: '24px',
+                        border: '1px solid rgba(0,0,0,0.05)',
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}>
+                        <h3 style={{ fontSize: '14px', fontWeight: '700', marginBottom: '16px', color: 'var(--text-primary)' }}>Final Value Distribution</h3>
+                        <div style={{ flex: 1 }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={distribution} layout="vertical">
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" horizontal={false} />
+                                    <XAxis type="number" hide />
+                                    <YAxis
+                                        dataKey="range"
+                                        type="category"
+                                        width={80}
+                                        tick={{ fontSize: 10, fill: 'var(--text-secondary)' }}
+                                        interval={0}
+                                        axisLine={false}
+                                        tickLine={false}
+                                    />
+                                    <Tooltip cursor={{ fill: 'rgba(0,0,0,0.03)' }} />
+                                    <Bar dataKey="count" fill="var(--text-primary)" radius={[0, 4, 4, 0]} barSize={10} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
-                </div>
 
-            </div>
+                </div>
+            )}
 
             {/* Market Comparison Chart (New) */}
             <div style={{
@@ -570,7 +654,7 @@ export const SimulationView: React.FC<SimulationViewProps> = ({ results, distrib
                                 fill="var(--text-tertiary)"
                                 stroke="none"
                                 fillOpacity={0.1}
-                                name="totalInvested"
+                                name="Total Invested"
                             />
 
                             <Line
@@ -579,8 +663,22 @@ export const SimulationView: React.FC<SimulationViewProps> = ({ results, distrib
                                 stroke="#3b82f6"
                                 strokeWidth={3}
                                 dot={false}
-                                name="My Portfolio (Median)"
+                                name="Portfolio A (Median)"
                             />
+
+                            {/* Comparison Line B */}
+                            {resultsB && (
+                                <Line
+                                    type="monotone"
+                                    data={resultsB}
+                                    dataKey="medianInfo"
+                                    stroke="var(--accent-orange)"
+                                    strokeWidth={3}
+                                    dot={false}
+                                    name="Portfolio B (Median)"
+                                />
+                            )}
+
                             <Line
                                 type="monotone"
                                 dataKey="benchmark"

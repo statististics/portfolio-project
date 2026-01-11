@@ -4,11 +4,12 @@ import { Sidebar } from './Sidebar';
 import { SimulationSidebar } from './SimulationSidebar';
 import { PortfolioTable } from './PortfolioTable';
 import { SimulationView } from './SimulationView';
+import { SurvivalView } from './SurvivalView';
 import { usePortfolio } from '../hooks/usePortfolio';
 import { useSimulation } from '../hooks/useSimulation';
 
 interface DashboardProps {
-    currentView: 'portfolio' | 'simulation';
+    currentView: 'portfolio' | 'simulation' | 'survival';
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ currentView }) => {
@@ -31,14 +32,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentView }) => {
         timeLeft
     } = usePortfolio();
 
-    // Simulation Hook
-    const { results, finalDistribution, stats, runSimulation, isSimulating, history, saveSimulation, deleteSimulation } = useSimulation();
+    // Simulation Hook (Monte Carlo Mode)
+    const simContext = useSimulation('sim_history');
+
+    // Survival Hook (Survival Mode)
+    // Separate history and state for "Separate Rooms" effect
+    const survContext = useSimulation('survival_history');
+
+    // Dynamic Context Switching based on View
+    const activeContext = currentView === 'survival' ? survContext : simContext;
+
+    const {
+        results, finalDistribution, stats,
+        resultsB, finalDistributionB, statsB,
+        statsA,
+        runSimulation, isSimulating, history, saveSimulation, deleteSimulation
+    } = activeContext;
 
     const handleRefresh = () => {
         refreshPortfolio(true);
     };
 
     const isRateLimited = timeLeft > 0;
+
+    const [isComparisonMode, setIsComparisonMode] = React.useState(false);
+
+    // Filter statsB based on comparison mode
+    const effectiveStatsB = isComparisonMode ? statsB : null;
 
     return (
         <div style={{
@@ -63,6 +83,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentView }) => {
                         totalPortfolioValue={totalPortfolioValue}
                         onRun={runSimulation}
                         isSimulating={isSimulating}
+                        mode={currentView === 'survival' ? 'survival' : 'simulation'}
+                        isComparisonMode={isComparisonMode}
+                        onToggleComparison={setIsComparisonMode}
                     />
                 )}
             </div>
@@ -175,15 +198,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentView }) => {
 
                         <PortfolioTable assets={assets} totalValue={totalPortfolioValue} onRemoveAsset={removeAsset} onReorder={reorderAssets} />
                     </>
-                ) : (
+                ) : currentView === 'simulation' ? (
                     <SimulationView
                         results={results}
                         distribution={finalDistribution}
                         stats={stats}
+                        // Pass B coords if comparison mode is active
+                        resultsB={isComparisonMode ? resultsB : undefined}
+                        distributionB={isComparisonMode ? finalDistributionB : undefined}
+                        statsB={isComparisonMode ? statsB : undefined}
+
                         history={history}
                         onSave={(name) => saveSimulation(name, assets)} // Save current assets with simulation
                         onDelete={deleteSimulation}
                     />
+                ) : (
+                    <SurvivalView statsA={statsA} statsB={effectiveStatsB} />
                 )}
             </div>
         </div>

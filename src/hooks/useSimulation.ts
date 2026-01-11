@@ -22,6 +22,11 @@ export interface SimulationStats {
     portfolioBestYear?: number;
     portfolioWorstYear?: number;
     isDca?: boolean;
+    allPaths?: number[][]; // Full simulation paths for dynamic analysis
+    survivalStats?: {
+        survivalCurve: { month: number; probability: number }[];
+        medianSurvivalTime?: number; // Months until < 50% survival
+    };
 }
 
 interface SimulationParams {
@@ -51,16 +56,21 @@ export interface SimulationRun {
     assets?: any[]; // Snapshot of portfolio assets
 }
 
-export const useSimulation = () => {
-    const [results, setResults] = useState<SimulationResult[]>([]);
-    const [finalDistribution, setFinalDistribution] = useState<{ range: string; count: number }[]>([]);
-    const [stats, setStats] = useState<SimulationStats | null>(null);
+export const useSimulation = (storageKey: string = 'sim_history') => {
+    const [resultsA, setResultsA] = useState<SimulationResult[]>([]);
+    const [finalDistributionA, setFinalDistributionA] = useState<{ range: string; count: number }[]>([]);
+    const [statsA, setStatsA] = useState<SimulationStats | null>(null);
+
+    const [resultsB, setResultsB] = useState<SimulationResult[]>([]);
+    const [finalDistributionB, setFinalDistributionB] = useState<{ range: string; count: number }[]>([]);
+    const [statsB, setStatsB] = useState<SimulationStats | null>(null);
+
     const [isSimulating, setIsSimulating] = useState(false);
 
     // History State (Persisted)
     const [history, setHistory] = useState<SimulationRun[]>(() => {
         try {
-            const saved = localStorage.getItem('sim_history');
+            const saved = localStorage.getItem(storageKey);
             return saved ? JSON.parse(saved) : [];
         } catch (e) { return []; }
     });
@@ -68,12 +78,12 @@ export const useSimulation = () => {
     // Save history to localStorage whenever it changes
     const updateHistory = (newHistory: SimulationRun[]) => {
         setHistory(newHistory);
-        localStorage.setItem('sim_history', JSON.stringify(newHistory));
+        localStorage.setItem(storageKey, JSON.stringify(newHistory));
     };
 
     const saveSimulation = (name: string, currentAssets?: any[]) => {
         console.log("Attempting to save simulation:", name);
-        if (!stats) {
+        if (!statsA) {
             console.error("Save failed: No stats available");
             return;
         }
@@ -83,7 +93,7 @@ export const useSimulation = () => {
                 id: Date.now().toString(),
                 name,
                 timestamp: Date.now(),
-                stats,
+                stats: statsA,
                 assets: currentAssets
             };
             const newHistory = [...history, newRun];
@@ -104,7 +114,7 @@ export const useSimulation = () => {
         updateHistory([]);
     };
 
-    const runSimulation = useCallback((params: SimulationParams) => {
+    const runSimulation = useCallback((params: SimulationParams, target: 'A' | 'B' = 'A') => {
         setIsSimulating(true);
         setTimeout(() => { // Allow UI to render loading state
             const { initialValue, targetGoal, timeHorizon, numSimulations, expectedReturn, volatility, riskStats, benchmark, monthlyCost = 0, monthlyStats } = params;
@@ -207,6 +217,14 @@ export const useSimulation = () => {
                 benchmarkPaths[0].push(initialValue);
             }
 
+            // Initialize allPaths to store full history for each simulation
+            // allPaths[s] will be an array of length totalMonths
+            const allPaths: number[][] = Array(numSimulations).fill(0).map(() => []);
+
+            // Survival Analysis Tracking
+            // Store the month index of first failure (-1 if never failed)
+            const firstFailureMonth = new Int32Array(numSimulations).fill(-1);
+
             // Simulate Years
             for (let t = 1; t <= timeHorizon; t++) {
                 const yearData: SimulationResult = { year: t };
@@ -301,12 +319,29 @@ export const useSimulation = () => {
                         }
 
                         // --- 3. Add Contribution ---
-                        const currentCost = monthlyCost * priceIdxMonth;
+                        // FIX: Contribution should be fixed nominal dollars (DCA), not scaling with asset growth
+                        const currentCost = monthlyCost;
                         valMonth += currentCost;
                         invested += currentCost;
 
+                        const totalValWithCont = valInit + valMonth;
+
+                        // --- Store Path Data ---
+                        // We store the monthly value for KM
+                        allPaths[s].push(totalValWithCont);
+
+                        // --- Survival Check ---
+                        // Check if Total Value < Total Invested
+                        // We do this Post-Contribution? Or Pre?
+                        // Usually "current status". After contribution, you have more invested.
+                        // If Value < Invested, you are in loss.
+                        // Use a small epsilon for floating point issues
+                        if (firstFailureMonth[s] === -1 && totalValWithCont < (invested - 0.01)) {
+                            firstFailureMonth[s] = (t - 1) * stepsPerYear + m + 1; // Month index (1-based)
+                        }
+
                         // Update Prev for next step
-                        prevTotalVal = valInit + valMonth;
+                        prevTotalVal = totalValWithCont;
 
                         // --- Benchmark Step ---
                         const bu1 = Math.random();
@@ -425,8 +460,8 @@ export const useSimulation = () => {
             const medianWorstYear = computeMedian(pathWorstYear);
 
             // Success Rate vs Target Goal (or Initial if not set)
-            const target = targetGoal || initialValue;
-            const successCount = finalValues.filter(v => v >= target).length;
+            const goalValue = targetGoal || initialValue;
+            const successCount = finalValues.filter(v => v >= goalValue).length;
             const successRate = (successCount / numSimulations) * 100;
 
             // Calculate Histogram logic
@@ -445,30 +480,96 @@ export const useSimulation = () => {
                 };
             });
 
-            setResults(chartData);
-            setStats({
-                median,
-                worstCase,
-                successRate,
-                targetGoal,
-                riskStats,
-                initialValue,
-                portfolioMDD: medianMDD,
-                portfolioSharpe: medianSharpe,
-                portfolioBeta: medianBeta,
-                portfolioBestYear: medianBestYear,
-                portfolioWorstYear: medianWorstYear,
-                isDca: monthlyCost > 0
-            });
-            setFinalDistribution(distribution);
+            // --- Survival Analysis Logic ---
+            // Calculate Survival Curve
+            // Total months
+            const totalMonths = timeHorizon * stepsPerYear;
+            const survivalCurve: { month: number; probability: number }[] = [];
+
+            // For every month, count how many have NOT failed yet
+            // Survival Prob(t) = (Sims that haven't failed by t) / Total Sims
+            // We can optimize this by sorting failures
+            const failures = Array.from(firstFailureMonth).filter(m => m !== -1).sort((a, b) => a - b);
+
+            let failedCount = 0;
+            let fIdx = 0;
+
+            // Add Month 0
+            survivalCurve.push({ month: 0, probability: 100 });
+
+            for (let m = 1; m <= totalMonths; m++) {
+                // Count new failures at this month
+                while (fIdx < failures.length && failures[fIdx] <= m) {
+                    failedCount++;
+                    fIdx++;
+                }
+                const prob = ((numSimulations - failedCount) / numSimulations) * 100;
+                survivalCurve.push({ month: m, probability: prob });
+            }
+
+            let medianSurvivalTime: number | undefined = undefined;
+            // Find first month where prob < 50%
+            const crossPoint = survivalCurve.find(p => p.probability < 50);
+            if (crossPoint) {
+                medianSurvivalTime = crossPoint.month;
+            }
+
+            if (target === 'A') {
+                setResultsA(chartData);
+                setStatsA({
+                    median,
+                    worstCase,
+                    successRate,
+                    targetGoal,
+                    riskStats,
+                    initialValue,
+                    portfolioMDD: medianMDD,
+                    portfolioSharpe: medianSharpe,
+                    portfolioBeta: medianBeta,
+                    portfolioBestYear: medianBestYear,
+                    portfolioWorstYear: medianWorstYear,
+                    isDca: monthlyCost > 0,
+                    allPaths,
+                    survivalStats: {
+                        survivalCurve,
+                        medianSurvivalTime
+                    }
+                });
+                setFinalDistributionA(distribution);
+            } else {
+                setResultsB(chartData);
+                setStatsB({
+                    median,
+                    worstCase,
+                    successRate,
+                    targetGoal,
+                    riskStats,
+                    initialValue,
+                    portfolioMDD: medianMDD,
+                    portfolioSharpe: medianSharpe,
+                    portfolioBeta: medianBeta,
+                    portfolioBestYear: medianBestYear,
+                    portfolioWorstYear: medianWorstYear,
+                    isDca: monthlyCost > 0,
+                    allPaths,
+                    survivalStats: {
+                        survivalCurve,
+                        medianSurvivalTime
+                    }
+                });
+                setFinalDistributionB(distribution);
+            }
+
             setIsSimulating(false);
         }, 100);
-    }, [history]); // Add history dependency if needed, though runSimulation doesn't use it directly.
+    }, [history]);
 
     return {
-        results, // For Line Chart
-        finalDistribution, // For Bar Chart
-        stats,
+        results: resultsA,
+        finalDistribution: finalDistributionA,
+        stats: statsA,
+        resultsA, finalDistributionA, statsA,
+        resultsB, finalDistributionB, statsB,
         runSimulation,
         isSimulating,
         history,

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Dashboard } from './components/Dashboard';
 
 function App() {
-    const [currentView, setCurrentView] = useState<'portfolio' | 'simulation'>('portfolio');
+    const [currentView, setCurrentView] = useState<'portfolio' | 'simulation' | 'survival'>('portfolio');
 
     return (
         <div style={{
@@ -87,6 +87,23 @@ function App() {
                                     }}
                                 >
                                     Simulation
+                                </button>
+                                <button
+                                    onClick={() => setCurrentView('survival')}
+                                    style={{
+                                        border: 'none',
+                                        background: currentView === 'survival' ? 'white' : 'transparent',
+                                        padding: '6px 16px',
+                                        borderRadius: '999px',
+                                        fontSize: '14px',
+                                        fontWeight: '600',
+                                        color: currentView === 'survival' ? 'black' : 'var(--text-tertiary)',
+                                        boxShadow: currentView === 'survival' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                    }}
+                                >
+                                    Survival
                                 </button>
                             </div>
                         </div>
